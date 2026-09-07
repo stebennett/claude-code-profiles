@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { EXIT_FAILED, runCli } from './cli.ts';
+import { runCli } from './cli.ts';
+import { EXIT_FAILED } from './exit-codes.ts';
 import { processDeps } from './process-deps.ts';
 
 try {

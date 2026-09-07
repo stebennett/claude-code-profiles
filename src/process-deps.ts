@@ -39,13 +39,27 @@ async function askYesNo(question: string): Promise<boolean> {
 }
 
 /**
+ * Signals the terminal sends to the whole foreground process group, so the
+ * child already has its own copy: Claude Code decides what Ctrl-C means, and
+ * the parent stays alive only to report how the child finished.
+ */
+const SIGNALS_CHILD_OWNS = ['SIGINT', 'SIGQUIT'] as const;
+
+/** Signals aimed at this process, which under `exec` would have been the child's. */
+const SIGNALS_FORWARDED = ['SIGTERM', 'SIGHUP'] as const;
+
+/**
  * Stands in for `exec`, which Node cannot do: run the child attached to this
- * process's streams, then exit with whatever it exited with, so the caller's
- * shell sees Claude Code's own exit code and signal.
+ * process's streams and terminate this process the way the child terminated,
+ * so the caller's shell sees Claude Code's own exit code or signal.
  *
- * The parent survives for the child's lifetime, which `exec` would not, so
- * signal handling is not yet identical to running `claude` directly. #11 owns
- * getting that exact.
+ * The parent outlives the child, which a real `exec` would not, so the gap is
+ * closed by hand: signals the terminal delivers to the group are left to the
+ * child, signals aimed at this pid are forwarded to it, and a signalled child
+ * is re-raised here rather than reported as an ordinary exit.
+ *
+ * None of this is reachable from the unit suite, which never spawns anything;
+ * it is the real-`claude` integration test (#7) that can hold it honest.
  */
 function launchAndExit(
   command: string,
@@ -55,11 +69,28 @@ function launchAndExit(
   return new Promise<never>((_resolve, reject) => {
     const child = spawn(command, [...args], { stdio: 'inherit', env });
 
+    const installed: [NodeJS.Signals, () => void][] = [
+      // Handling a signal with a no-op is how a Node process ignores it.
+      ...SIGNALS_CHILD_OWNS.map((signal): [NodeJS.Signals, () => void] => [
+        signal,
+        () => undefined,
+      ]),
+      ...SIGNALS_FORWARDED.map((signal): [NodeJS.Signals, () => void] => [
+        signal,
+        () => void child.kill(signal),
+      ]),
+    ];
+
+    for (const [signal, handler] of installed) process.on(signal, handler);
+
     child.on('error', reject);
 
     child.on('exit', (code, signal) => {
       if (signal !== null) {
-        // Re-raise so the shell sees a signalled death, not an ordinary exit.
+        // Dropping the handlers this function installed — and only those —
+        // restores Node's default disposition, so the shell sees a signalled
+        // death rather than an exit code standing in for one.
+        for (const [handled, handler] of installed) process.off(handled, handler);
         process.kill(process.pid, signal);
         return;
       }
