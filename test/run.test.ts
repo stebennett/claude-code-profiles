@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { LAUNCHED, runCliInHarness } from './support/cli-harness.ts';
-import { givenProfile } from './support/profiles.ts';
+import { givenProfile, givenToolState } from './support/profiles.ts';
 
 let tmp: string;
 
@@ -126,15 +126,75 @@ describe('run <name> when claude cannot be launched', () => {
   });
 });
 
-describe('run with arguments it cannot act on', () => {
-  it('requires a name, since selecting the Default Profile is not built yet', async () => {
-    const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: tmp } });
+describe('run with no name', () => {
+  it('Runs the Default Profile', async () => {
+    const root = join(tmp, 'profiles');
+    const profile = await givenProfile(root, 'work');
+    await givenToolState(root, { defaultProfile: 'work' });
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain('requires a Profile name');
+    const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.env.CLAUDE_CONFIG_DIR).toBe(profile);
+    // The Active Profile is the Profile's own name, not `default`: a session
+    // has to be able to say which configuration it is under (ADR-0003).
+    expect(result.launches[0]?.env.CCP_ACTIVE_PROFILE).toBe('work');
+  });
+
+  it('still forwards everything after -- to claude', async () => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+    await givenToolState(root, { defaultProfile: 'work' });
+
+    const result = await runCliInHarness(['run', '--', '--model', 'opus'], {
+      env: { CCP_PROFILES_DIR: root },
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.args).toEqual(['--model', 'opus']);
+  });
+
+  it('exits 1 explaining how to set a default when none is set', async () => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('ccprofile default <name>');
     expect(result.launches).toEqual([]);
   });
 
+  it('treats malformed tool state as no default set rather than crashing', async () => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+    await mkdir(join(root, '.ccp'), { recursive: true });
+    await writeFile(join(root, '.ccp', 'config.json'), '{"defaultProfile": tr');
+
+    const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('ccprofile default <name>');
+    expect(result.launches).toEqual([]);
+  });
+
+  it('names the Default Profile when it has since gone, rather than a name nobody typed', async () => {
+    const root = join(tmp, 'profiles');
+    await mkdir(root, { recursive: true });
+    await givenToolState(root, { defaultProfile: 'work' });
+
+    const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Default Profile 'work'");
+    // Not `ccprofile new work`: the fix is choosing another default, and the
+    // user never typed this name.
+    expect(result.stderr).toContain('ccprofile default <name>');
+    expect(result.launches).toEqual([]);
+  });
+});
+
+describe('run with arguments it cannot act on', () => {
   it('rejects an option of its own rather than reading it as a name', async () => {
     const result = await runCliInHarness(['run', '-y', 'work'], {
       env: { CCP_PROFILES_DIR: tmp },

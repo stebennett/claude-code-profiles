@@ -1,5 +1,33 @@
-import { mkdir, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+/** Where this tool's own state lives, relative to the Profiles Root. */
+const TOOL_STATE = join('.ccp', 'config.json');
+
+/**
+ * Plants this tool's own state, so a test can arrive with a Default Profile
+ * already set. Takes an arbitrary object rather than a name: what a *later*
+ * version may have written is as much a case worth setting up as what this one
+ * writes. Malformed states are written verbatim by the tests that need them.
+ */
+export async function givenToolState(root: string, state: unknown): Promise<void> {
+  const file = join(root, TOOL_STATE);
+  await mkdir(join(root, '.ccp'), { recursive: true });
+  await writeFile(file, `${JSON.stringify(state)}\n`);
+}
+
+/**
+ * The tool state as it stands, or `undefined` if none was written. The absent
+ * case is a value rather than a throw because "nothing was recorded" is what
+ * several tests assert.
+ */
+export async function readToolState(root: string): Promise<unknown> {
+  try {
+    return JSON.parse(await readFile(join(root, TOOL_STATE), 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Creates a Profile the way a user would: a directory in the Profiles Root and

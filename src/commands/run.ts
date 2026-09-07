@@ -2,48 +2,71 @@ import { buildChildEnv } from '../core/child-env.ts';
 import { profileNameError } from '../core/profile-name.ts';
 import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
+import { readDefaultProfile } from '../core/tool-state.ts';
 import type { CliDeps } from '../deps.ts';
 import { errnoCode } from '../errno.ts';
 import { EXIT_FAILED, EXIT_USAGE } from '../exit-codes.ts';
-import { profileNotFound, requiresProfileName, unexpectedArgument, unknownOption } from '../messages.ts';
+import {
+  defaultProfileMissing,
+  noDefaultProfile,
+  profileNotFound,
+  unexpectedArgument,
+  unknownOption,
+} from '../messages.ts';
 
 /** Runs Claude Code under a Profile. See docs/spec.md, "`ccprofile run`". */
 export async function run(argv: readonly string[], deps: CliDeps): Promise<number> {
   const { own, forwarded } = splitAtDoubleDash(argv);
 
-  const [name, unexpected, ...rest] = own;
-  if (name === undefined) {
-    // Running the Default Profile instead of erroring is issue #15.
-    deps.stderr(requiresProfileName('run'));
-    return EXIT_USAGE;
-  }
-  if (name.startsWith('-')) {
-    deps.stderr(unknownOption(name));
-    return EXIT_USAGE;
-  }
-  if (unexpected !== undefined) {
-    const forClaude = [unexpected, ...rest].join(' ');
-    deps.stderr(
-      unexpectedArgument(
-        unexpected,
-        `Pass Claude Code's own arguments after --, as: ccprofile run ${name} -- ${forClaude}\n`,
-      ),
-    );
-    return EXIT_USAGE;
-  }
+  // Every argument check here is about a name the user typed; with none there
+  // is nothing to refuse, since a second argument cannot arrive without a
+  // first. Nesting them says that, rather than each restating it.
+  const [named, unexpected, ...rest] = own;
+  if (named !== undefined) {
+    if (named.startsWith('-')) {
+      deps.stderr(unknownOption(named));
+      return EXIT_USAGE;
+    }
+    if (unexpected !== undefined) {
+      const forClaude = [unexpected, ...rest].join(' ');
+      deps.stderr(
+        unexpectedArgument(
+          unexpected,
+          `Pass Claude Code's own arguments after --, as: ccprofile run ${named} -- ${forClaude}\n`,
+        ),
+      );
+      return EXIT_USAGE;
+    }
 
-  const nameError = profileNameError(name);
-  if (nameError !== undefined) {
-    deps.stderr(`ccprofile: ${nameError}\n`);
-    return EXIT_USAGE;
+    const nameError = profileNameError(named);
+    if (nameError !== undefined) {
+      deps.stderr(`ccprofile: ${nameError}\n`);
+      return EXIT_USAGE;
+    }
   }
 
   const profilesRoot = resolveProfilesRoot(deps);
 
+  // With no name, the Default Profile (ADR-0003). A name recorded in tool
+  // state has already been held to `profileNameError` on the way out of it, so
+  // only the typed one is checked above.
+  const name = named ?? (await readDefaultProfile(profilesRoot));
+  if (name === undefined) {
+    deps.stderr(noDefaultProfile());
+    return EXIT_FAILED;
+  }
+
   // A Run never creates: a mistyped name would otherwise leave an empty,
   // unauthenticated Profile and an unexplained login prompt.
   if (!(await profileExists(profilePath(profilesRoot, name)))) {
-    deps.stderr(profileNotFound(name, profilesRoot));
+    // Which message depends on who chose the name. `ccprofile new work` is the
+    // fix for a name the user typed; for one they did not, it would be advice
+    // about a Profile they never asked for.
+    deps.stderr(
+      named === undefined
+        ? defaultProfileMissing(name, profilesRoot)
+        : profileNotFound(name, profilesRoot),
+    );
     return EXIT_FAILED;
   }
 

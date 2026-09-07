@@ -32,6 +32,10 @@ _Avoid_: default, default profile, root config
 The Profile this tool selects when a Run names no Profile. It is configurable, and is therefore not necessarily the Bare Config Directory — the two are distinct concepts that deliberately may resolve differently.
 _Avoid_: default config, primary profile
 
+**Tool State**:
+What this tool itself persists, as opposed to what a Profile contains. It is the only thing in the Profiles Root that is not a Profile, and it is hidden so that the invariant "every visible entry is a Profile" holds. Losing it loses a preference, never a Profile.
+_Avoid_: config, settings, tool config, profile state
+
 **Run**:
 To launch Claude Code against a chosen Profile. A Run selects its Profile at launch; a Profile cannot be changed for a session already in progress.
 _Avoid_: switch, activate, use

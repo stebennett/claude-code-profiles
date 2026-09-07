@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run <name>`, `ccprofile list`, `ccprofile path <name>` and `ccprofile current` work today, so a Profile can be created, logged in to, used, listed, located and identified. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
@@ -21,6 +21,9 @@ ccprofile new work          # create it, launch it, log in
 ccprofile run work          # launch Claude Code under the "work" Profile
 ccprofile run work -- --model opus
 ccprofile list              # what Profiles exist, and which account each uses
+
+ccprofile default work      # make "work" the Profile a bare run launches
+ccprofile run               # …so the area of work you use most is the shortest command
 ```
 
 Nothing is copied, symlinked, or merged. Your existing `~/.claude` is never written to.
@@ -66,6 +69,8 @@ Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues
 
 Profiles live in `$CCP_PROFILES_DIR`, defaulting to `$CLAUDE_CONFIG_DIR/profiles`, and otherwise `~/.claude/profiles`.
 
+`ccprofile`'s own state — currently just your chosen default — lives in `.ccp/config.json` beneath that root. It is hidden so that every *visible* entry in the Profiles Root is a Profile, which is why listing Profiles needs no exclusion list. Delete it and you have no default; nothing else is lost.
+
 `ccprofile default` is the Profile `ccprofile run` uses when you name none. It does **not** change what plain `claude` does — that always uses `~/.claude`, and no tool that works by setting an environment variable can change it. See [ADR-0003](./docs/adr/0003-default-profile-diverges-from-bare-claude.md).
 
 ## Deliberately not included
@@ -102,7 +107,8 @@ wires the real process effects in for the actual binary.
 
 Profiles themselves are real directories in a real temporary Profiles Root, so
 the filesystem is exercised rather than faked; `test/support/profiles.ts`
-creates them the way a user or Claude Code would.
+creates them — and plants the tool's own state — the way a user or Claude Code
+would.
 
 ## Documentation
 

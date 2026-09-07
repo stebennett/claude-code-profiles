@@ -1,7 +1,7 @@
 /**
- * Commands here describe the target design; ones not yet implemented answer as
- * unknown. Options are only listed once they work, so `-y/--yes` returns with
- * the `CLAUDE_CONFIG_DIR` guard that gives it something to answer (#16).
+ * Every command listed here now works. Options are only listed once they do,
+ * so `-y/--yes` returns with the `CLAUDE_CONFIG_DIR` guard that gives it
+ * something to answer (#16).
  */
 export const USAGE = `Usage: ccprofile <command> [options]
 
