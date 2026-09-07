@@ -2,6 +2,8 @@
 
 Vocabulary in this document is defined in [`CONTEXT.md`](../CONTEXT.md). Decisions behind it are in [`docs/adr/`](./adr/).
 
+> **This is the design reference.** The implementation-facing spec — problem statement, user stories, testing decisions — is [issue #8](https://github.com/stebennett/claude-code-profiles/issues/8). The two overlap by design and serve different readers: this file explains the shape of the thing, the issue is what an implementer works from. Keep them in step when either changes.
+
 ## Purpose
 
 Keep several independent Claude Code configurations on one machine and launch Claude Code against a chosen one, so that separate areas of work do not share configuration, MCP servers, memory, or Claude accounts.
