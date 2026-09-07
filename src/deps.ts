@@ -12,6 +12,8 @@ export interface CliDeps {
   homeDir: string;
   /** Whether stdin is a terminal, and so whether a prompt can be answered. */
   isTTY: boolean;
+  /** The current time, which `list` measures its last-used column against. */
+  now: () => Date;
   /** Writes to standard output verbatim; the caller supplies any newline. */
   stdout: (text: string) => void;
   /** Writes to standard error verbatim; the caller supplies any newline. */

@@ -26,6 +26,8 @@ export interface HarnessOptions {
   cwd?: string;
   homeDir?: string;
   isTTY?: boolean;
+  /** Freezes the clock, so a relative time is a fact rather than a race. */
+  now?: Date;
   /** Answers the confirmation prompt. Throws if unset and a prompt is reached. */
   confirm?: (question: string) => Promise<boolean>;
   /** Fails the launch with this error, standing in for a failed `exec`. */
@@ -56,6 +58,7 @@ export async function runCliInHarness(
     cwd: options.cwd ?? '/tmp/ccprofile-test-cwd',
     homeDir: options.homeDir ?? '/tmp/ccprofile-test-home',
     isTTY: options.isTTY ?? true,
+    now: () => options.now ?? new Date(),
     stdout: (text) => {
       stdout += text;
     },

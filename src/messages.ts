@@ -24,3 +24,14 @@ export function unknownOption(option: string): string {
 export function requiresProfileName(command: string): string {
   return `ccprofile: ${command} requires a Profile name\n\n${USAGE}`;
 }
+
+/**
+ * An argument no command can place. Every command refuses one rather than
+ * dropping it, and each says something different about why — `run` names the
+ * `--` form, `new` creates one Profile at a time, `path` prints one, `current`
+ * reports rather than selects, `list` shows every Profile — so `advice` stays
+ * the caller's and only the line that is identical in all five lives here.
+ */
+export function unexpectedArgument(argument: string, advice: string): string {
+  return `ccprofile: unexpected argument '${argument}'\n${advice}`;
+}

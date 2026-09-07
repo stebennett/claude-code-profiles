@@ -11,6 +11,7 @@ export function processDeps(): CliDeps {
     cwd: process.cwd(),
     homeDir: homedir(),
     isTTY: stdinIsTTY(),
+    now: () => new Date(),
     stdout: (text) => void process.stdout.write(text),
     stderr: (text) => void process.stderr.write(text),
     confirm: askYesNo,

@@ -1,6 +1,6 @@
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { unknownOption } from '../messages.ts';
+import { unexpectedArgument, unknownOption } from '../messages.ts';
 
 /**
  * What a session with no Active Profile reports. Only a Run records one, so
@@ -25,8 +25,10 @@ export function current(argv: readonly string[], deps: CliDeps): Promise<number>
     }
 
     deps.stderr(
-      `ccprofile: unexpected argument '${unexpected}'\n` +
+      unexpectedArgument(
+        unexpected,
         `current reports the Profile this session is under; to launch one, use: ccprofile run ${unexpected}\n`,
+      ),
     );
     return Promise.resolve(EXIT_USAGE);
   }

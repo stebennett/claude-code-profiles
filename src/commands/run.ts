@@ -5,7 +5,7 @@ import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { errnoCode } from '../errno.ts';
 import { EXIT_FAILED, EXIT_USAGE } from '../exit-codes.ts';
-import { profileNotFound, requiresProfileName, unknownOption } from '../messages.ts';
+import { profileNotFound, requiresProfileName, unexpectedArgument, unknownOption } from '../messages.ts';
 
 /** Runs Claude Code under a Profile. See docs/spec.md, "`ccprofile run`". */
 export async function run(argv: readonly string[], deps: CliDeps): Promise<number> {
@@ -24,8 +24,10 @@ export async function run(argv: readonly string[], deps: CliDeps): Promise<numbe
   if (unexpected !== undefined) {
     const forClaude = [unexpected, ...rest].join(' ');
     deps.stderr(
-      `ccprofile: unexpected argument '${unexpected}'\n` +
+      unexpectedArgument(
+        unexpected,
         `Pass Claude Code's own arguments after --, as: ccprofile run ${name} -- ${forClaude}\n`,
+      ),
     );
     return EXIT_USAGE;
   }

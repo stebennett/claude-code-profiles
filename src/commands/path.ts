@@ -3,7 +3,7 @@ import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { profileNotFound, requiresProfileName, unknownOption } from '../messages.ts';
+import { profileNotFound, requiresProfileName, unexpectedArgument, unknownOption } from '../messages.ts';
 
 /** Prints a Profile's absolute path. See docs/spec.md, "`ccprofile path`". */
 export async function path(argv: readonly string[], deps: CliDeps): Promise<number> {
@@ -18,8 +18,7 @@ export async function path(argv: readonly string[], deps: CliDeps): Promise<numb
   }
   if (unexpected !== undefined) {
     deps.stderr(
-      `ccprofile: unexpected argument '${unexpected}'\n` +
-        `path prints one Profile at a time: ccprofile path ${name}\n`,
+      unexpectedArgument(unexpected, `path prints one Profile at a time: ccprofile path ${name}\n`),
     );
     return EXIT_USAGE;
   }
