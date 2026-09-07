@@ -97,6 +97,9 @@ describe('new <name> where something is already there', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('work');
+    // A directory in the Profiles Root is a Profile, so running it is the
+    // advice that gets the user what they asked for.
+    expect(result.stderr).toContain('ccprofile run work');
     expect(result.launches).toEqual([]);
     // Untouched: no settings.json written into the directory it refused.
     expect(await readdir(join(root, 'work'))).toEqual(['skills']);
@@ -111,6 +114,9 @@ describe('new <name> where something is already there', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.launches).toEqual([]);
+    // Not a Profile, so it must not suggest running one: that would fail in
+    // turn, with a different message, for a reason the user was not told.
+    expect(result.stderr).not.toContain('ccprofile run work');
     await expect(readFile(join(root, 'work'), 'utf8')).resolves.toBe('not a Profile');
   });
 });

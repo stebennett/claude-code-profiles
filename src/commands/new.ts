@@ -1,6 +1,6 @@
-import { profileNameError } from '../core/profile-name.ts';
 import { createProfile } from '../core/profile-create.ts';
-import { profilePath } from '../core/profiles.ts';
+import { profileNameError } from '../core/profile-name.ts';
+import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
@@ -43,10 +43,14 @@ export async function create(argv: readonly string[], deps: CliDeps): Promise<nu
   const path = profilePath(profilesRoot, name);
 
   if ((await createProfile(path)) === 'exists') {
-    deps.stderr(
-      `ccprofile: ${path} already exists\n` +
-        `ccprofile never adopts an existing directory. Run it with: ccprofile run ${name}\n`,
-    );
+    // A directory here is already a Profile (ADR-0002), so running it is what
+    // the user wanted. Anything else at that path is not, and suggesting a Run
+    // would only send them into a second, differently worded failure.
+    const advice = (await profileExists(path))
+      ? `It is already a Profile. Run it with: ccprofile run ${name}\n`
+      : `ccprofile never adopts what is already there. Move it aside, or pick another name.\n`;
+
+    deps.stderr(`ccprofile: ${path} already exists\n${advice}`);
     return EXIT_USAGE;
   }
 
