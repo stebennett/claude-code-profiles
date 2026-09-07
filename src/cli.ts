@@ -1,3 +1,4 @@
+import { create } from './commands/new.ts';
 import { run } from './commands/run.ts';
 import type { CliDeps } from './deps.ts';
 import { EXIT_OK, EXIT_USAGE } from './exit-codes.ts';
@@ -24,6 +25,10 @@ export function runCli(argv: readonly string[], deps: CliDeps): Promise<number> 
   if (command === '--version' || command === '-v') {
     deps.stdout(`${packageVersion()}\n`);
     return Promise.resolve(EXIT_OK);
+  }
+
+  if (command === 'new') {
+    return create(argv.slice(1), deps);
   }
 
   if (command === 'run') {
