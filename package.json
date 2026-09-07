@@ -1,0 +1,37 @@
+{
+  "name": "ccprofile",
+  "version": "0.0.0",
+  "description": "Run Claude Code under separate, fully isolated configurations — one per area of work.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ccprofile": "dist/bin.js"
+  },
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stebennett/claude-code-profiles.git"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "eslint": "^10.10.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^5.0.0"
+  }
+}
