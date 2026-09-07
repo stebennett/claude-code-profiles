@@ -2,18 +2,31 @@ import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** Where this tool's own state lives, relative to the Profiles Root. */
-const TOOL_STATE = join('.ccp', 'config.json');
+const STATE_DIR = '.ccp';
+const STATE_FILE = 'config.json';
+
+/** The state directory, which a test may need to plant something else at. */
+export function toolStateDir(root: string): string {
+  return join(root, STATE_DIR);
+}
 
 /**
  * Plants this tool's own state, so a test can arrive with a Default Profile
- * already set. Takes an arbitrary object rather than a name: what a *later*
+ * already set. Takes an arbitrary object rather than a name: state a *later*
  * version may have written is as much a case worth setting up as what this one
- * writes. Malformed states are written verbatim by the tests that need them.
+ * writes.
  */
 export async function givenToolState(root: string, state: unknown): Promise<void> {
-  const file = join(root, TOOL_STATE);
-  await mkdir(join(root, '.ccp'), { recursive: true });
-  await writeFile(file, `${JSON.stringify(state)}\n`);
+  await givenRawToolState(root, `${JSON.stringify(state)}\n`);
+}
+
+/**
+ * Plants state bytes verbatim, for the shapes `JSON.stringify` cannot produce:
+ * a truncated write, an empty file, JSON that is not an object.
+ */
+export async function givenRawToolState(root: string, content: string): Promise<void> {
+  await mkdir(toolStateDir(root), { recursive: true });
+  await writeFile(join(toolStateDir(root), STATE_FILE), content);
 }
 
 /**
@@ -23,7 +36,7 @@ export async function givenToolState(root: string, state: unknown): Promise<void
  */
 export async function readToolState(root: string): Promise<unknown> {
   try {
-    return JSON.parse(await readFile(join(root, TOOL_STATE), 'utf8'));
+    return JSON.parse(await readFile(join(toolStateDir(root), STATE_FILE), 'utf8'));
   } catch {
     return undefined;
   }

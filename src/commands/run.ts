@@ -9,6 +9,7 @@ import { EXIT_FAILED, EXIT_USAGE } from '../exit-codes.ts';
 import {
   defaultProfileMissing,
   noDefaultProfile,
+  profileNameRejected,
   profileNotFound,
   unexpectedArgument,
   unknownOption,
@@ -40,7 +41,7 @@ export async function run(argv: readonly string[], deps: CliDeps): Promise<numbe
 
     const nameError = profileNameError(named);
     if (nameError !== undefined) {
-      deps.stderr(`ccprofile: ${nameError}\n`);
+      deps.stderr(profileNameRejected(nameError));
       return EXIT_USAGE;
     }
   }

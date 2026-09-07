@@ -1,11 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runCliInHarness } from './support/cli-harness.ts';
-import { givenProfile, givenToolState, readToolState } from './support/profiles.ts';
+import {
+  givenProfile,
+  givenRawToolState,
+  givenToolState,
+  readToolState,
+  toolStateDir,
+} from './support/profiles.ts';
 
 let tmp: string;
 
@@ -60,8 +66,7 @@ describe('default <name>', () => {
   it('replaces malformed state rather than refusing to set a default', async () => {
     const root = join(tmp, 'profiles');
     await givenProfile(root, 'work');
-    await mkdir(join(root, '.ccp'), { recursive: true });
-    await writeFile(join(root, '.ccp', 'config.json'), '{ not json');
+    await givenRawToolState(root, '{ not json');
 
     const result = await runCliInHarness(['default', 'work'], {
       env: { CCP_PROFILES_DIR: root },
@@ -77,7 +82,7 @@ describe('default <name>', () => {
 
     await runCliInHarness(['default', 'work'], { env: { CCP_PROFILES_DIR: root } });
 
-    expect(await readFile(join(root, '.ccp', 'config.json'), 'utf8')).toMatch(/\n$/);
+    expect(await readFile(join(toolStateDir(root), 'config.json'), 'utf8')).toMatch(/\n$/);
   });
 });
 
@@ -193,14 +198,44 @@ describe('default with tool state it cannot read', () => {
   ])('treats %s as no default set rather than crashing', async (_description, content) => {
     const root = join(tmp, 'profiles');
     await givenProfile(root, 'work');
-    await mkdir(join(root, '.ccp'), { recursive: true });
-    await writeFile(join(root, '.ccp', 'config.json'), content);
+    await givenRawToolState(root, content);
 
     const result = await runCliInHarness(['default'], { env: { CCP_PROFILES_DIR: root } });
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toContain('ccprofile default <name>');
+  });
+
+  it('treats a directory wearing the state file name as no default set', async () => {
+    // Not a shape `JSON.parse` can fail on: the read itself fails, with
+    // EISDIR. The file is not there and something else has its name, which is
+    // a malformed state rather than one we should have been able to read.
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+    await mkdir(join(toolStateDir(root), 'config.json'), { recursive: true });
+
+    const result = await runCliInHarness(['default'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('ccprofile default <name>');
+  });
+
+  it('reports a state file it should have been able to read, rather than ignoring it', async () => {
+    // The other side of the line: a state that is present but unreadable is a
+    // real failure, and answering "no default set" would hide it.
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+    await givenRawToolState(root, '{"defaultProfile": "work"}');
+    await chmod(join(toolStateDir(root), 'config.json'), 0o000);
+
+    await expect(
+      runCliInHarness(['default'], { env: { CCP_PROFILES_DIR: root } }),
+    ).rejects.toThrow(/EACCES|permission/i);
+
+    // Restored so the temporary directory can be removed.
+    await chmod(join(toolStateDir(root), 'config.json'), 0o600);
   });
 });
 

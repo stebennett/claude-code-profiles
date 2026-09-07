@@ -36,6 +36,16 @@ export function defaultProfileMissing(name: string, profilesRoot: string): strin
   );
 }
 
+/**
+ * A name that is not a valid Profile name. The reason comes from
+ * `profileNameError`, which every command asks and none words itself: the
+ * prefix is the only part that was ever the command's, and it is identical in
+ * all four.
+ */
+export function profileNameRejected(reason: string): string {
+  return `ccprofile: ${reason}\n`;
+}
+
 /** An argument in a Profile name's place that is plainly an option instead. */
 export function unknownOption(option: string): string {
   return `ccprofile: unknown option '${option}'\n\n${USAGE}`;

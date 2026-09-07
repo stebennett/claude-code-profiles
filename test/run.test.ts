@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { LAUNCHED, runCliInHarness } from './support/cli-harness.ts';
-import { givenProfile, givenToolState } from './support/profiles.ts';
+import { givenProfile, givenRawToolState, givenToolState } from './support/profiles.ts';
 
 let tmp: string;
 
@@ -168,8 +168,7 @@ describe('run with no name', () => {
   it('treats malformed tool state as no default set rather than crashing', async () => {
     const root = join(tmp, 'profiles');
     await givenProfile(root, 'work');
-    await mkdir(join(root, '.ccp'), { recursive: true });
-    await writeFile(join(root, '.ccp', 'config.json'), '{"defaultProfile": tr');
+    await givenRawToolState(root, '{"defaultProfile": tr');
 
     const result = await runCliInHarness(['run'], { env: { CCP_PROFILES_DIR: root } });
 

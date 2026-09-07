@@ -4,7 +4,13 @@ import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import { readDefaultProfile, writeDefaultProfile } from '../core/tool-state.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { noDefaultProfile, profileNotFound, unexpectedArgument, unknownOption } from '../messages.ts';
+import {
+  noDefaultProfile,
+  profileNameRejected,
+  profileNotFound,
+  unexpectedArgument,
+  unknownOption,
+} from '../messages.ts';
 
 /**
  * Gets or sets the Default Profile. See docs/spec.md, "`ccprofile default`".
@@ -13,8 +19,7 @@ import { noDefaultProfile, profileNotFound, unexpectedArgument, unknownOption } 
  * exports `create`.
  */
 export async function defaultProfile(argv: readonly string[], deps: CliDeps): Promise<number> {
-  // Both checks are about a name the user typed, and a second argument cannot
-  // arrive without a first, so with no name there is nothing here to refuse.
+  // Nested for the reason `run` gives: with no name there is nothing to refuse.
   const [name, unexpected] = argv;
   if (name !== undefined) {
     if (name.startsWith('-')) {
@@ -45,13 +50,15 @@ export async function defaultProfile(argv: readonly string[], deps: CliDeps): Pr
  * unusable shows up.
  */
 async function report(profilesRoot: string, deps: CliDeps): Promise<number> {
-  const current = await readDefaultProfile(profilesRoot);
-  if (current === undefined) {
+  // Not `current`: CONTEXT.md keeps "current profile" away from the Active
+  // Profile, which is a different thing and a sibling command.
+  const recorded = await readDefaultProfile(profilesRoot);
+  if (recorded === undefined) {
     deps.stderr(noDefaultProfile());
     return EXIT_FAILED;
   }
 
-  deps.stdout(`${current}\n`);
+  deps.stdout(`${recorded}\n`);
   return EXIT_OK;
 }
 
@@ -63,7 +70,7 @@ async function report(profilesRoot: string, deps: CliDeps): Promise<number> {
 async function select(profilesRoot: string, name: string, deps: CliDeps): Promise<number> {
   const nameError = profileNameError(name);
   if (nameError !== undefined) {
-    deps.stderr(`ccprofile: ${nameError}\n`);
+    deps.stderr(profileNameRejected(nameError));
     return EXIT_USAGE;
   }
 
