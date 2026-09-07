@@ -17,13 +17,15 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 describe('list', () => {
-  it('prints one row per Profile with its name, account and last-used time', async () => {
+  it('prints one row per Profile with its name, Profile Identity and last-used time', async () => {
     const root = join(tmp, 'profiles');
     const lastUsed = new Date('2026-09-07T12:00:00Z');
-    await givenUsedProfile(root, 'work', { account: 'steve@example.com', lastUsed });
+    await givenUsedProfile(root, 'work', { identity: 'steve@example.com', lastUsed });
 
     const result = await runCliInHarness(['list'], {
       env: { CCP_PROFILES_DIR: root },
@@ -43,7 +45,7 @@ describe('list for a Profile with no Profile Identity', () => {
   it('lists a brand-new Profile rather than hiding what it cannot report', async () => {
     const root = join(tmp, 'profiles');
     // A Profile is a directory and nothing else (ADR-0002): until it has been
-    // Run there is no `.claude.json`, and so neither an account nor a time.
+    // Run there is no `.claude.json`, and so neither an Identity nor a time.
     await givenProfile(root, 'scratch');
 
     const result = await runCliInHarness(['list'], { env: { CCP_PROFILES_DIR: root } });
@@ -86,6 +88,9 @@ describe('list where `.claude.json` is not what we expect', () => {
     ['an oauthAccount that is null', '{"oauthAccount": null}'],
     ['an oauthAccount with no email', '{"oauthAccount": {"accountUuid": "abc"}}'],
     ['an email that is not a string', '{"oauthAccount": {"emailAddress": 42}}'],
+    // A blank address names nobody, so it is no more an Identity than a
+    // missing one — and it would otherwise print as an empty column.
+    ['an empty email', '{"oauthAccount": {"emailAddress": ""}}'],
   ])('reports no Identity for a `.claude.json` that is %s', async (_description, content) => {
     const root = join(tmp, 'profiles');
     await givenUsedProfile(root, 'work', { content });
@@ -177,8 +182,6 @@ describe('list with arguments it cannot place', () => {
 
 describe('list last-used column', () => {
   const WRITTEN = new Date('2026-09-07T12:00:00Z');
-  const MINUTE = 60 * 1000;
-  const DAY = 24 * HOUR;
 
   it.each([
     ['seconds', 30 * 1000, 'just now'],
@@ -195,7 +198,7 @@ describe('list last-used column', () => {
     ['a clock ahead of the file', -HOUR, 'just now'],
   ])('renders %s as "%s"', async (_description, elapsed, expected) => {
     const root = join(tmp, 'profiles');
-    await givenUsedProfile(root, 'work', { account: 'me@example.com', lastUsed: WRITTEN });
+    await givenUsedProfile(root, 'work', { identity: 'me@example.com', lastUsed: WRITTEN });
 
     const result = await runCliInHarness(['list'], {
       env: { CCP_PROFILES_DIR: root },
@@ -223,17 +226,17 @@ describe('list ordering', () => {
     expect(names).toEqual(['archive', 'client-a', 'personal', 'work', 'zebra']);
   });
 
-  it('gives the same order twice, so a diff of two listings is meaningful', async () => {
+  it('orders `--json` by name too, so two listings can be diffed', async () => {
     const root = join(tmp, 'profiles');
     for (const name of ['work', 'archive', 'personal']) await givenProfile(root, name);
-    const env = { CCP_PROFILES_DIR: root };
 
-    const [first, second] = await Promise.all([
-      runCliInHarness(['list', '--json'], { env }),
-      runCliInHarness(['list', '--json'], { env }),
+    const result = await runCliInHarness(['list', '--json'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect((JSON.parse(result.stdout) as { name: string }[]).map(({ name }) => name)).toEqual([
+      'archive',
+      'personal',
+      'work',
     ]);
-
-    expect(first.stdout).toBe(second.stdout);
   });
 });
 
@@ -242,7 +245,7 @@ describe('list --json', () => {
     const root = join(tmp, 'profiles');
     const lastUsed = new Date('2026-09-07T12:00:00Z');
     const work = await givenUsedProfile(root, 'work', {
-      account: 'steve@example.com',
+      identity: 'steve@example.com',
       lastUsed,
     });
     const scratch = await givenProfile(root, 'scratch');

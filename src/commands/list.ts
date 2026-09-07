@@ -3,7 +3,7 @@ import { listProfileNames, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { unknownOption } from '../messages.ts';
+import { unexpectedArgument, unknownOption } from '../messages.ts';
 import { relativeTime } from '../relative-time.ts';
 
 const JSON_FLAG = '--json';
@@ -17,7 +17,17 @@ const NEVER = 'never';
 /** What a Profiles Root with nothing in it prints. */
 const EMPTY = 'No Profiles yet.\nCreate one with: ccprofile new <name>\n';
 
-const HEADINGS = ['NAME', 'ACCOUNT', 'LAST USED'] as const;
+/**
+ * One rendered line's three columns. A fixed-width tuple rather than a list,
+ * so the renderer has no absent-column case to defend against.
+ */
+type Cells = readonly [name: string, account: string, lastUsed: string];
+
+/**
+ * `ACCOUNT` rather than `IDENTITY`: the column shows an email address, and
+ * this is the one place the user-facing wording wins over the glossary.
+ */
+const HEADINGS: Cells = ['NAME', 'ACCOUNT', 'LAST USED'];
 
 /** The gap between columns, wide enough to read as a gap rather than a space. */
 const GAP = '  ';
@@ -44,8 +54,10 @@ export async function list(argv: readonly string[], deps: CliDeps): Promise<numb
     // Refused rather than dropped: a name here is a `path` or a `run`, and
     // listing everything would look like it had been honoured and ignored.
     deps.stderr(
-      `ccprofile: unexpected argument '${unexpected}'\n` +
+      unexpectedArgument(
+        unexpected,
         `list shows every Profile; for one, use: ccprofile path ${unexpected}\n`,
+      ),
     );
     return EXIT_USAGE;
   }
@@ -93,32 +105,27 @@ function renderJson(rows: readonly Row[]): string {
 function renderTable(rows: readonly Row[], now: Date): string {
   if (rows.length === 0) return EMPTY;
 
-  const cells = rows.map(({ name, identity, lastUsed }) => [
+  const cells: Cells[] = rows.map(({ name, identity, lastUsed }) => [
     name,
     identity ?? NOT_LOGGED_IN,
     lastUsed === undefined ? NEVER : relativeTime(lastUsed, now),
   ]);
 
-  return table([[...HEADINGS], ...cells]);
+  return table([HEADINGS, ...cells]);
 }
 
 /**
- * Renders rows in aligned columns. The last cell is never padded, so no line
- * carries trailing whitespace into a terminal or a pipe.
+ * Renders rows in aligned columns. The last column is never padded, so no
+ * line carries trailing whitespace into a terminal or a pipe.
  */
-function table(rows: readonly string[][]): string {
-  const widths = rows[0]?.map((_cell, column) =>
-    Math.max(...rows.map((row) => (row[column] ?? '').length)),
-  );
+function table(rows: readonly Cells[]): string {
+  const width = (column: 0 | 1) => Math.max(...rows.map((row) => row[column].length));
+  const [nameWidth, accountWidth] = [width(0), width(1)];
 
   return rows
     .map(
-      (row) =>
-        `${row
-          .map((cell, column) =>
-            column === row.length - 1 ? cell : cell.padEnd(widths?.[column] ?? 0),
-          )
-          .join(GAP)}\n`,
+      ([name, account, lastUsed]) =>
+        `${name.padEnd(nameWidth)}${GAP}${account.padEnd(accountWidth)}${GAP}${lastUsed}\n`,
     )
     .join('');
 }

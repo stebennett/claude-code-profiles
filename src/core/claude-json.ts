@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { errnoCode } from '../errno.ts';
+import { isMissing } from '../errno.ts';
 
 /** The file Claude Code writes inside a Config Directory on startup. */
 const CLAUDE_JSON = '.claude.json';
@@ -30,7 +30,6 @@ export async function readClaudeJson(profile: string): Promise<ClaudeJson> {
   // last-used time; only the Identity is lost with the contents.
   return { identity: await readIdentity(file), lastUsed };
 }
-
 
 /**
  * The Profile Identity recorded in `.claude.json`, or `undefined`.
@@ -62,10 +61,7 @@ async function lastWritten(file: string): Promise<Date | undefined> {
   try {
     return (await stat(file)).mtime;
   } catch (error) {
-    const code = errnoCode(error);
-    // ENOTDIR: something on the way to the file is not a directory, so the
-    // file cannot be there either.
-    if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
+    if (isMissing(error)) return undefined;
     throw error;
   }
 }

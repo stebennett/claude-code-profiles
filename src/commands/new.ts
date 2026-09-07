@@ -4,7 +4,7 @@ import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { requiresProfileName, unknownOption } from '../messages.ts';
+import { requiresProfileName, unexpectedArgument, unknownOption } from '../messages.ts';
 import { run } from './run.ts';
 
 const NO_LAUNCH = '--no-launch';
@@ -25,8 +25,7 @@ export async function create(argv: readonly string[], deps: CliDeps): Promise<nu
   }
   if (unexpected !== undefined) {
     deps.stderr(
-      `ccprofile: unexpected argument '${unexpected}'\n` +
-        `new creates one Profile at a time: ccprofile new ${name}\n`,
+      unexpectedArgument(unexpected, `new creates one Profile at a time: ccprofile new ${name}\n`),
     );
     return EXIT_USAGE;
   }

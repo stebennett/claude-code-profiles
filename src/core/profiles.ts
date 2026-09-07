@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { errnoCode } from '../errno.ts';
+import { isMissing } from '../errno.ts';
 
 /** Where a Profile of this name lives, given an already-resolved Profiles Root. */
 export function profilePath(profilesRoot: string, name: string): string {
@@ -36,8 +36,7 @@ async function readRoot(profilesRoot: string): Promise<string[]> {
   try {
     return await readdir(profilesRoot);
   } catch (error) {
-    const code = errnoCode(error);
-    if (code === 'ENOENT' || code === 'ENOTDIR') return [];
+    if (isMissing(error)) return [];
     throw error;
   }
 }
@@ -54,9 +53,7 @@ export async function profileExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
   } catch (error) {
-    const code = errnoCode(error);
-    // ENOTDIR: a path component is a file, so nothing can exist beneath it.
-    if (code === 'ENOENT' || code === 'ENOTDIR') return false;
+    if (isMissing(error)) return false;
     throw error;
   }
 }

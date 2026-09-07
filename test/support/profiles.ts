@@ -13,8 +13,11 @@ export async function givenProfile(root: string, name: string): Promise<string> 
 
 /** How the `.claude.json` a test plants should differ from a logged-in one. */
 export interface UsedProfileOptions {
-  /** Recorded as `oauthAccount.emailAddress`, the way Claude Code records it. */
-  account?: string;
+  /**
+   * The Profile Identity, written to `oauthAccount.emailAddress` the way
+   * Claude Code records it.
+   */
+  identity?: string;
   /** Written verbatim instead, for the partial and unparseable cases. */
   content?: string;
   /** The file's mtime, which is the last-used time `list` reports. */
@@ -38,7 +41,7 @@ export async function givenUsedProfile(
     file,
     options.content ??
       JSON.stringify(
-        options.account === undefined ? {} : { oauthAccount: { emailAddress: options.account } },
+        options.identity === undefined ? {} : { oauthAccount: { emailAddress: options.identity } },
       ),
   );
 
