@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: design complete, implementation not started. See [`docs/spec.md`](./docs/spec.md).
+> Status: in development. The package scaffold and CI are in place; no command is implemented yet, so the commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
@@ -77,6 +77,27 @@ rm -rf "$(ccprofile path old-profile)"
 ```
 
 Also out of scope for 1.0: cloning Profiles, shell integration, a TUI, and declarative/shareable Profile definitions. All [tracked as issues](../../issues).
+
+## Development
+
+Node 22+. TypeScript, ESM only.
+
+```bash
+npm install
+npm run typecheck    # tsc, source and tests
+npm run lint         # eslint
+npm test             # vitest — no claude on PATH, no credentials, no network
+npm run build        # tsc → dist/
+```
+
+CI runs those four on every push and pull request, on Node 22 across Linux and macOS.
+
+Everything is tested through one seam: `runCli(argv, deps)`, with only the
+unmockable effects injected — `env`, `cwd`, `homeDir`, `stdout`, `stderr`,
+`isTTY`, `confirm` and `launch`. `launch` is the load-bearing one: a Run
+replaces the process, so tests assert what *would* have been executed and with
+which environment, rather than spawning Claude Code. `src/process-deps.ts`
+wires the real process effects in for the actual binary.
 
 ## Documentation
 
