@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run <name>`, `ccprofile path <name>` and `ccprofile current` work today, so a Profile can be created, logged in to, used, located and identified. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: in development. `ccprofile new <name>`, `ccprofile run <name>`, `ccprofile list`, `ccprofile path <name>` and `ccprofile current` work today, so a Profile can be created, logged in to, used, listed, located and identified. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
@@ -94,10 +94,15 @@ CI runs those four on every push and pull request, on Node 22 across Linux and m
 
 Everything is tested through one seam: `runCli(argv, deps)`, with only the
 unmockable effects injected — `env`, `cwd`, `homeDir`, `stdout`, `stderr`,
-`isTTY`, `confirm` and `launch`. `launch` is the load-bearing one: a Run
+`isTTY`, `now`, `confirm` and `launch`. `launch` is the load-bearing one: a Run
 replaces the process, so tests assert what *would* have been executed and with
-which environment, rather than spawning Claude Code. `src/process-deps.ts`
+which environment, rather than spawning Claude Code. `now` is what makes
+`list`'s relative times a fact rather than a race. `src/process-deps.ts`
 wires the real process effects in for the actual binary.
+
+Profiles themselves are real directories in a real temporary Profiles Root, so
+the filesystem is exercised rather than faked; `test/support/profiles.ts`
+creates them the way a user or Claude Code would.
 
 ## Documentation
 

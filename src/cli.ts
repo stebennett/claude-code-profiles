@@ -1,4 +1,5 @@
 import { current } from './commands/current.ts';
+import { list } from './commands/list.ts';
 import { create } from './commands/new.ts';
 import { path } from './commands/path.ts';
 import { run } from './commands/run.ts';
@@ -35,6 +36,10 @@ export function runCli(argv: readonly string[], deps: CliDeps): Promise<number> 
 
   if (command === 'current') {
     return current(argv.slice(1), deps);
+  }
+
+  if (command === 'list') {
+    return list(argv.slice(1), deps);
   }
 
   if (command === 'path') {
