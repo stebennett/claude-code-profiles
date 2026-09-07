@@ -1,4 +1,6 @@
+import { current } from './commands/current.ts';
 import { create } from './commands/new.ts';
+import { path } from './commands/path.ts';
 import { run } from './commands/run.ts';
 import type { CliDeps } from './deps.ts';
 import { EXIT_OK, EXIT_USAGE } from './exit-codes.ts';
@@ -29,6 +31,14 @@ export function runCli(argv: readonly string[], deps: CliDeps): Promise<number> 
 
   if (command === 'new') {
     return create(argv.slice(1), deps);
+  }
+
+  if (command === 'current') {
+    return current(argv.slice(1), deps);
+  }
+
+  if (command === 'path') {
+    return path(argv.slice(1), deps);
   }
 
   if (command === 'run') {
