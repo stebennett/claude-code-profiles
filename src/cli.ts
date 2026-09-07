@@ -12,8 +12,11 @@ export const EXIT_USAGE = 2;
 /**
  * The CLI's single seam. Parses `argv` (without the node and script
  * arguments), performs the work through `deps`, and returns an exit code.
+ *
+ * Returns a promise rather than being `async` only because nothing awaits yet;
+ * the commands that do will make it `async`.
  */
-export async function runCli(argv: readonly string[], deps: CliDeps): Promise<number> {
+export function runCli(argv: readonly string[], deps: CliDeps): Promise<number> {
   const [command] = argv;
 
   if (command === '--help' || command === '-h') {

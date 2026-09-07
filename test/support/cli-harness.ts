@@ -51,27 +51,13 @@ export async function runCliInHarness(
       ((question) => Promise.reject(new Error(`unexpected prompt: ${question}`))),
     launch: (command, args, env) => {
       launches.push({ command, args, env });
-      // A real launch replaces the process, so control never returns. The fake
-      // signals the same thing by never resolving normally.
-      return Promise.reject(new LaunchedError());
+      // A real launch replaces the process, so control never returns. Nothing
+      // launches yet, so a reject is enough to make an unexpected one loud.
+      return Promise.reject(new Error(`unexpected launch: ${command}`));
     },
   };
 
-  let exitCode: number;
-  try {
-    exitCode = await runCli(argv, deps);
-  } catch (error) {
-    if (!(error instanceof LaunchedError)) throw error;
-    exitCode = 0;
-  }
+  const exitCode = await runCli(argv, deps);
 
   return { exitCode, stdout, stderr, launches };
-}
-
-/** Thrown by the fake `launch` to stand in for the process being replaced. */
-class LaunchedError extends Error {
-  constructor() {
-    super('launched');
-    this.name = 'LaunchedError';
-  }
 }
