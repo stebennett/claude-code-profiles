@@ -5,7 +5,7 @@ import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { errnoCode } from '../errno.ts';
 import { EXIT_FAILED, EXIT_USAGE } from '../exit-codes.ts';
-import { USAGE } from '../usage.ts';
+import { profileNotFound, requiresProfileName, unknownOption } from '../messages.ts';
 
 /** Runs Claude Code under a Profile. See docs/spec.md, "`ccprofile run`". */
 export async function run(argv: readonly string[], deps: CliDeps): Promise<number> {
@@ -14,11 +14,11 @@ export async function run(argv: readonly string[], deps: CliDeps): Promise<numbe
   const [name, unexpected, ...rest] = own;
   if (name === undefined) {
     // Running the Default Profile instead of erroring is issue #15.
-    deps.stderr(`ccprofile: run requires a Profile name\n\n${USAGE}`);
+    deps.stderr(requiresProfileName('run'));
     return EXIT_USAGE;
   }
   if (name.startsWith('-')) {
-    deps.stderr(`ccprofile: unknown option '${name}'\n\n${USAGE}`);
+    deps.stderr(unknownOption(name));
     return EXIT_USAGE;
   }
   if (unexpected !== undefined) {
@@ -41,10 +41,7 @@ export async function run(argv: readonly string[], deps: CliDeps): Promise<numbe
   // A Run never creates: a mistyped name would otherwise leave an empty,
   // unauthenticated Profile and an unexplained login prompt.
   if (!(await profileExists(profilePath(profilesRoot, name)))) {
-    deps.stderr(
-      `ccprofile: no Profile named '${name}' in ${profilesRoot}\n` +
-        `Create it with: ccprofile new ${name}\n`,
-    );
+    deps.stderr(profileNotFound(name, profilesRoot));
     return EXIT_FAILED;
   }
 

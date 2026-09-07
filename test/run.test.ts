@@ -5,15 +5,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { LAUNCHED, runCliInHarness } from './support/cli-harness.ts';
+import { givenProfile } from './support/profiles.ts';
 
 let tmp: string;
-
-/** Creates a Profile the way a user would: a directory in the Profiles Root. */
-async function givenProfile(root: string, name: string): Promise<string> {
-  const dir = join(root, name);
-  await mkdir(dir, { recursive: true });
-  return dir;
-}
 
 beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), 'ccprofile-run-'));

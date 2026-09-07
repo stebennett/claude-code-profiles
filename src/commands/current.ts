@@ -1,6 +1,6 @@
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { USAGE } from '../usage.ts';
+import { unknownOption } from '../messages.ts';
 
 /**
  * What a session with no Active Profile reports. Only a Run records one, so
@@ -10,12 +10,17 @@ import { USAGE } from '../usage.ts';
  */
 const UNKNOWN = 'unknown (not launched via ccprofile)';
 
-/** Prints the Active Profile. See docs/spec.md, "`ccprofile current`". */
+/**
+ * Prints the Active Profile. See docs/spec.md, "`ccprofile current`".
+ *
+ * The one command with nothing to await: reading the environment is all it
+ * does, so it returns a promise rather than being `async`.
+ */
 export function current(argv: readonly string[], deps: CliDeps): Promise<number> {
   const [unexpected] = argv;
   if (unexpected !== undefined) {
     if (unexpected.startsWith('-')) {
-      deps.stderr(`ccprofile: unknown option '${unexpected}'\n\n${USAGE}`);
+      deps.stderr(unknownOption(unexpected));
       return Promise.resolve(EXIT_USAGE);
     }
 

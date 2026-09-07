@@ -4,7 +4,7 @@ import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { USAGE } from '../usage.ts';
+import { requiresProfileName, unknownOption } from '../messages.ts';
 import { run } from './run.ts';
 
 const NO_LAUNCH = '--no-launch';
@@ -16,11 +16,11 @@ export async function create(argv: readonly string[], deps: CliDeps): Promise<nu
 
   const [name, unexpected] = positional;
   if (name === undefined) {
-    deps.stderr(`ccprofile: new requires a Profile name\n\n${USAGE}`);
+    deps.stderr(requiresProfileName('new'));
     return EXIT_USAGE;
   }
   if (name.startsWith('-')) {
-    deps.stderr(`ccprofile: unknown option '${name}'\n\n${USAGE}`);
+    deps.stderr(unknownOption(name));
     return EXIT_USAGE;
   }
   if (unexpected !== undefined) {
