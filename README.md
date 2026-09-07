@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>` and `ccprofile run <name>` work today, so a Profile can be created, logged in to and used. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: in development. `ccprofile new <name>`, `ccprofile run <name>`, `ccprofile path <name>` and `ccprofile current` work today, so a Profile can be created, logged in to, used, located and identified. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. The other commands below describe the target design. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
