@@ -3,7 +3,13 @@ import { profileExists, profilePath } from '../core/profiles.ts';
 import { resolveProfilesRoot } from '../core/profiles-root.ts';
 import type { CliDeps } from '../deps.ts';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../exit-codes.ts';
-import { profileNotFound, requiresProfileName, unexpectedArgument, unknownOption } from '../messages.ts';
+import {
+  profileNameRejected,
+  profileNotFound,
+  requiresProfileName,
+  unexpectedArgument,
+  unknownOption,
+} from '../messages.ts';
 
 /** Prints a Profile's absolute path. See docs/spec.md, "`ccprofile path`". */
 export async function path(argv: readonly string[], deps: CliDeps): Promise<number> {
@@ -25,7 +31,7 @@ export async function path(argv: readonly string[], deps: CliDeps): Promise<numb
 
   const nameError = profileNameError(name);
   if (nameError !== undefined) {
-    deps.stderr(`ccprofile: ${nameError}\n`);
+    deps.stderr(profileNameRejected(nameError));
     return EXIT_USAGE;
   }
 

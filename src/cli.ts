@@ -1,4 +1,5 @@
 import { current } from './commands/current.ts';
+import { defaultProfile } from './commands/default.ts';
 import { list } from './commands/list.ts';
 import { create } from './commands/new.ts';
 import { path } from './commands/path.ts';
@@ -48,6 +49,10 @@ export function runCli(argv: readonly string[], deps: CliDeps): Promise<number> 
 
   if (command === 'run') {
     return run(argv.slice(1), deps);
+  }
+
+  if (command === 'default') {
+    return defaultProfile(argv.slice(1), deps);
   }
 
   if (command === undefined) {

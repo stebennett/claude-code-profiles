@@ -134,6 +134,22 @@ describe('list and what is not a Profile', () => {
     expect(result.stdout).not.toContain('.cache');
   });
 
+  it('does not list the state directory that setting a default brings into being', async () => {
+    // The test above plants `.ccp` by hand; this one has the tool write it, so
+    // the invariant is pinned against what `default` actually does rather than
+    // against a fixture's idea of it.
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+    await runCliInHarness(['default', 'work'], { env: { CCP_PROFILES_DIR: root } });
+
+    const result = await runCliInHarness(['list', '--json'], { env: { CCP_PROFILES_DIR: root } });
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([
+      { name: 'work', path: join(root, 'work'), account: null, lastUsed: null },
+    ]);
+  });
+
   it('does not list a plain file, which is not a Profile', async () => {
     const root = join(tmp, 'profiles');
     await givenProfile(root, 'work');
