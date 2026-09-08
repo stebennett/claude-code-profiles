@@ -9,6 +9,7 @@ import {
   type Installed,
   removeInstalledPackage,
   runOnPath,
+  runViaNpx,
 } from './support/installed.ts';
 
 /**
@@ -26,6 +27,9 @@ import {
  * Packing and installing is slow and identical for every assertion, so it
  * happens once for the file.
  */
+
+/** What npm puts in a tarball whatever `files` says, and a user does read. */
+const ALWAYS_PUBLISHED = ['package.json', 'README.md', 'LICENSE'];
 
 let installed: Installed;
 
@@ -55,8 +59,8 @@ describe('the published package metadata', () => {
     });
   });
 
-  it('is a released version rather than the scaffold 0.0.0', () => {
-    expect(installed.manifest.version).not.toBe('0.0.0');
+  it('is the 1.x the spec scopes, rather than the scaffold 0.0.0', () => {
+    expect(installed.manifest.version).toMatch(/^1\./);
   });
 });
 
@@ -68,27 +72,22 @@ describe('the published tarball', () => {
   });
 
   it('holds nothing a user does not need to run it', () => {
-    // Source, tests, docs and build configuration are all on GitHub, where
-    // anyone reading them is better served. Shipping them would also mean
-    // shipping `src/*.ts` alongside `dist/*.js`, which invites the wrong one
-    // being loaded.
-    const unwanted = installed.files.filter(
-      (file) =>
-        file.startsWith('src/') ||
-        file.startsWith('test/') ||
-        file.startsWith('docs/') ||
-        file.startsWith('.github/') ||
-        file.startsWith('tsconfig') ||
-        file.startsWith('vitest') ||
-        // Declarations: the package has a `bin` and no `exports`, so nothing
-        // outside it can import the module seam. Source maps do ship.
-        file.endsWith('.d.ts') ||
-        file === 'eslint.config.js' ||
-        file === 'CLAUDE.md' ||
-        file === 'package-lock.json',
+    // Stated as an allowlist rather than a list of what must not appear: a new
+    // top-level file would slip past the second form, and source, tests, docs
+    // and build configuration are all on GitHub, where anyone reading them is
+    // better served anyway.
+    const extra = installed.files.filter(
+      (file) => !file.startsWith('dist/') && !ALWAYS_PUBLISHED.includes(file),
     );
 
-    expect(unwanted).toEqual([]);
+    expect(extra).toEqual([]);
+  });
+
+  it('ships no declarations, which nothing could import', () => {
+    // The package has a `bin` and no `exports`, so nothing outside it can
+    // reach the module seam. Source maps do ship: a stack trace in a bug
+    // report is worth the bytes.
+    expect(installed.files.filter((file) => file.endsWith('.d.ts'))).toEqual([]);
   });
 });
 
@@ -122,5 +121,18 @@ describe('the globally installed ccprofile', () => {
     expect(listed.stdout).toContain('packaged');
     expect(listed.code).toBe(0);
     expect((await stat(join(profilesRoot, 'packaged'))).isDirectory()).toBe(true);
+  });
+});
+
+describe('the package run through npx', () => {
+  // The README offers `npx ccprofile` as well as a global install, so it is
+  // worth the same proof. Naming the tarball is as close as it gets before a
+  // publish, and it is close: `npx <name>` fetches the tarball and then does
+  // exactly this.
+  it('prints its usage', async () => {
+    const result = await runViaNpx(installed, ['--help']);
+
+    expect(result.stdout).toContain('Usage: ccprofile <command> [options]');
+    expect(result.code).toBe(0);
   });
 });

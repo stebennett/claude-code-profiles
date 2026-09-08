@@ -1,9 +1,10 @@
-import { spawn } from 'node:child_process';
 import type { Stats } from 'node:fs';
 import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+
+import { spawnCapturing } from '../../support/spawn.ts';
 
 /**
  * The CLI as a user runs it, entry point and all. Node 22.18+ runs TypeScript
@@ -126,30 +127,22 @@ export function runBare(sandbox: Sandbox, claudeArgs: readonly string[]): Promis
  * which is set whenever the suite is itself run from inside a Run — cannot
  * decide the outcome. `PATH` is passed through because it is how `claude` is
  * found at all.
+ *
+ * The exit code `spawnCapturing` returns is dropped here rather than passed
+ * on, so that `Output` cannot tempt an assertion on it — see `runUnderProfile`
+ * for why there is nothing to say about it.
  */
-function capture(
+async function capture(
   command: string,
   args: readonly string[],
   sandbox: Sandbox,
   extraEnv: Record<string, string>,
 ): Promise<Output> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args], {
-      cwd: sandbox.cwd,
-      env: { PATH: process.env.PATH ?? '', HOME: sandbox.home, ...extraEnv },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
-
-    child.on('error', reject);
-    child.on('close', () => {
-      resolve({ stdout, stderr });
-    });
+  const { stdout, stderr } = await spawnCapturing(command, args, {
+    cwd: sandbox.cwd,
+    env: { PATH: process.env.PATH ?? '', HOME: sandbox.home, ...extraEnv },
   });
+  return { stdout, stderr };
 }
 
 /** Whether a file is there — never why it is not, which no assertion needs. */

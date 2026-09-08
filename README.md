@@ -69,7 +69,7 @@ npm install -g ccprofile     # or: npx ccprofile
 
 Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues).
 
-Both of those are checked on every push, on both platforms: CI packs the package, installs it globally, and runs the installed binary (`npm run test:package`).
+Both install routes are checked on every push, on both of those platforms: CI packs the package, installs it globally, runs the installed binary, and runs the tarball through `npx` (`npm run test:package`). The Node floor is declared in `engines` rather than tested — CI runs Node 22 and nothing older.
 
 ## Commands
 
@@ -121,9 +121,11 @@ CI runs all five on every push and pull request, on Node 22 across Linux and mac
 is in CI anyway: the matrix is the only honest way to claim the package
 installs and runs on both platforms. Everything it asserts is asserted against
 the tarball `npm pack` produced — the package metadata, that the tarball holds
-the built entry point and nothing a user does not need to run it, and that the
+the built entry point and nothing a user does not need to run it, that the
 installed `ccprofile` on `PATH` prints its usage and creates and lists a
-Profile. It needs no `claude`: `--no-launch` is what keeps it from wanting one.
+Profile, and that `npx` can run it too. It needs no `claude`: `--no-launch` is
+what keeps it from wanting one. It writes only to a temporary prefix, home and
+Profiles Root, so it cannot install over a `ccprofile` you have.
 
 The integration suite is deliberately not among them. It launches a real
 `claude` under a throwaway Profile and checks the mechanism the whole tool
