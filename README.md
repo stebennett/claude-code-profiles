@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works, and a `CLAUDE_CONFIG_DIR` you set yourself is now asked about before a Run overrides it. What remains before 1.0 is an integration test against a real `claude`, and packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works, and a `CLAUDE_CONFIG_DIR` you set yourself is now asked about before a Run overrides it. Isolation itself is now covered by an integration test against a real `claude` (`npm run test:integration`). What remains before 1.0 is packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
@@ -108,9 +108,22 @@ npm run typecheck    # tsc, source and tests
 npm run lint         # eslint
 npm test             # vitest — no claude on PATH, no credentials, no network
 npm run build        # tsc → dist/
+
+npm run test:integration   # opt-in: needs Claude Code installed and on PATH
 ```
 
-CI runs those four on every push and pull request, on Node 22 across Linux and macOS.
+CI runs the first four on every push and pull request, on Node 22 across Linux and macOS.
+
+The integration suite is deliberately not among them. It launches a real
+`claude` under a throwaway Profile and checks the mechanism the whole tool
+rests on ([ADR-0001](./docs/adr/0001-directory-swap-via-claude-config-dir.md)):
+`.claude.json`, `projects/`, `sessions/` and `backups/` are created inside the
+Profile, MCP servers configured outside it are invisible within it, and
+`$HOME/.claude.json` is byte-identical afterwards. It needs no Claude
+account — everything it asserts happens before Claude Code asks for one — and
+it runs against a temporary home of its own, so your configuration is neither
+read nor written. Exit codes are never asserted on: `claude` returns them
+inconsistently here, and they say nothing about isolation.
 
 Almost everything is tested through one seam: `runCli(argv, deps)`, with only the
 unmockable effects injected — `env`, `cwd`, `homeDir`, `stdout`, `stderr`,
