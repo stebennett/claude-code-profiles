@@ -157,6 +157,23 @@ describe('new <name>', () => {
     );
   });
 
+  // There is one launch path, so the guard on a user-set CLAUDE_CONFIG_DIR is
+  // inherited rather than restated here. The Profile is still created: the
+  // prompt is about the launch, and `ccprofile run work --yes` is what follows
+  // a no — or `--no-launch`, for a script with no terminal to ask on.
+  it('asks before overriding a user-set CLAUDE_CONFIG_DIR, having created the Profile', async () => {
+    const root = join(tmp, 'profiles');
+
+    const result = await runCliInHarness(['new', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+      confirm: () => Promise.resolve(false),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.launches).toEqual([]);
+    await expect(readdir(root)).resolves.toEqual(['work']);
+  });
+
   it('creates a Profile that a later run finds, which is what --no-launch is for', async () => {
     const root = join(tmp, 'profiles');
     const env = { CCP_PROFILES_DIR: root };

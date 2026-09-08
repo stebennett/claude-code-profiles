@@ -126,6 +126,148 @@ describe('run <name> when claude cannot be launched', () => {
   });
 });
 
+describe('run under a CLAUDE_CONFIG_DIR the user set', () => {
+  it('exits 1 and launches nothing when the prompt is declined', async () => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+      confirm: () => Promise.resolve(false),
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.launches).toEqual([]);
+  });
+
+  it('launches with the Profile when the prompt is accepted, overriding the variable', async () => {
+    const root = join(tmp, 'profiles');
+    const profile = await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+      confirm: () => Promise.resolve(true),
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.env.CLAUDE_CONFIG_DIR).toBe(profile);
+  });
+
+  it('names the path being overridden and the Profile replacing it', async () => {
+    const root = join(tmp, 'profiles');
+    const handSet = join(tmp, 'hand-set');
+    const profile = await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: handSet },
+      confirm: () => Promise.resolve(false),
+    });
+
+    expect(result.stderr).toContain(handSet);
+    expect(result.stderr).toContain("'work'");
+    expect(result.stderr).toContain(profile);
+    expect(result.stdout).toBe('');
+  });
+
+  // The harness rejects an unanswered prompt, so reaching a launch at all is
+  // what says no prompt appeared.
+  it.each([
+    ['CCP_ACTIVE_PROFILE is present, since a Run set the variable', 'personal'],
+    ['CCP_ACTIVE_PROFILE names the same Profile this Run selected', 'work'],
+  ])('stays silent when %s', async (_description, active) => {
+    const root = join(tmp, 'profiles');
+    const profile = await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work'], {
+      env: {
+        CCP_PROFILES_DIR: root,
+        CLAUDE_CONFIG_DIR: join(root, active),
+        CCP_ACTIVE_PROFILE: active,
+      },
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.env.CLAUDE_CONFIG_DIR).toBe(profile);
+    expect(result.stderr).toBe('');
+  });
+
+  it.each([
+    ['unset', undefined],
+    // Empty is absent everywhere else in the tool, so there is no path here to
+    // warn about overriding.
+    ['empty', ''],
+  ])('stays silent when CLAUDE_CONFIG_DIR is %s', async (_description, configDir) => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: configDir },
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.stderr).toBe('');
+  });
+
+  it.each([
+    ['--yes before the name', ['run', '--yes', 'work']],
+    ['--yes after the name', ['run', 'work', '--yes']],
+    ['-y', ['run', '-y', 'work']],
+  ])('bypasses the prompt with %s', async (_description, argv) => {
+    const root = join(tmp, 'profiles');
+    const profile = await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(argv, {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.env.CLAUDE_CONFIG_DIR).toBe(profile);
+  });
+
+  it('forwards a -- -y to claude rather than reading it as its own', async () => {
+    const root = join(tmp, 'profiles');
+    await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work', '--', '-y'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+      confirm: () => Promise.resolve(true),
+    });
+
+    expect(result.launches[0]?.args).toEqual(['-y']);
+  });
+
+  it('exits 1 naming --yes without prompting when stdin is not a TTY', async () => {
+    const root = join(tmp, 'profiles');
+    const handSet = join(tmp, 'hand-set');
+    await givenProfile(root, 'work');
+
+    // No `confirm`: the harness rejects one, which is how "does not hang"
+    // becomes a fact here rather than an absence of evidence.
+    const result = await runCliInHarness(['run', 'work'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: handSet },
+      isTTY: false,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(handSet);
+    expect(result.stderr).toContain('--yes');
+    expect(result.launches).toEqual([]);
+  });
+
+  it('needs no TTY once --yes has answered the question', async () => {
+    const root = join(tmp, 'profiles');
+    const profile = await givenProfile(root, 'work');
+
+    const result = await runCliInHarness(['run', 'work', '--yes'], {
+      env: { CCP_PROFILES_DIR: root, CLAUDE_CONFIG_DIR: join(tmp, 'hand-set') },
+      isTTY: false,
+    });
+
+    expect(result.exitCode).toBe(LAUNCHED);
+    expect(result.launches[0]?.env.CLAUDE_CONFIG_DIR).toBe(profile);
+  });
+});
+
 describe('run with no name', () => {
   it('Runs the Default Profile', async () => {
     const root = join(tmp, 'profiles');
@@ -194,13 +336,15 @@ describe('run with no name', () => {
 });
 
 describe('run with arguments it cannot act on', () => {
-  it('rejects an option of its own rather than reading it as a name', async () => {
-    const result = await runCliInHarness(['run', '-y', 'work'], {
+  // `-y` was this example until it became an option run understands; an
+  // option it does not is still refused rather than read as a name.
+  it('rejects an unknown option rather than reading it as a name', async () => {
+    const result = await runCliInHarness(['run', '--model', 'work'], {
       env: { CCP_PROFILES_DIR: tmp },
     });
 
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain("unknown option '-y'");
+    expect(result.stderr).toContain("unknown option '--model'");
     expect(result.launches).toEqual([]);
   });
 
@@ -349,7 +493,9 @@ describe('Profiles Root resolution', () => {
 
   it.each([
     ['$CCP_PROFILES_DIR', { CCP_PROFILES_DIR: 'profiles' }],
-    ['$CLAUDE_CONFIG_DIR', { CLAUDE_CONFIG_DIR: '.' }],
+    // `CCP_ACTIVE_PROFILE` keeps this about root resolution: without it a
+    // set `CLAUDE_CONFIG_DIR` is the override guard's business instead.
+    ['$CLAUDE_CONFIG_DIR', { CLAUDE_CONFIG_DIR: '.', CCP_ACTIVE_PROFILE: 'previous' }],
   ])('resolves a relative %s against the working directory', async (_source, env) => {
     const profile = await givenProfile(join(tmp, 'profiles'), 'work');
 
