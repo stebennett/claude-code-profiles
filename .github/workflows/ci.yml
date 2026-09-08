@@ -4,6 +4,9 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # So that a release can require these same checks, on both platforms,
+  # rather than a second copy of them that could drift. See release.yml.
+  workflow_call:
 
 permissions:
   contents: read

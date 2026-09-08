@@ -156,11 +156,27 @@ the filesystem is exercised rather than faked; `test/support/profiles.ts`
 creates them — and plants the tool's own state — the way a user or Claude Code
 would.
 
+## Releasing
+
+Publishing happens in CI, not on anyone's machine. A pushed `v*` tag runs the
+release workflow, which requires the full CI matrix to pass and then publishes
+with provenance ([ADR-0004](./docs/adr/0004-publish-to-npm-from-ci.md)):
+
+```bash
+npm version 1.0.1        # commits the bump and tags it
+git push && git push --tags
+```
+
+The workflow refuses a tag whose version disagrees with `package.json`, so the
+tag and what npm serves cannot drift apart. It needs one thing this repository
+cannot hold: an npm granular access token with publish rights for `ccprofile`,
+stored as the `NPM_TOKEN` repository secret.
+
 ## Documentation
 
 - [`docs/spec.md`](./docs/spec.md) — the specification
 - [`CONTEXT.md`](./CONTEXT.md) — glossary
-- [`docs/adr/`](./docs/adr/) — why it is built this way
+- [`docs/adr/`](./docs/adr/) — why it is built this way, publishing included
 
 ## Prior art
 
