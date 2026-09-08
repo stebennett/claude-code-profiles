@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import type { Stats } from 'node:fs';
-import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -10,6 +10,9 @@ import { join } from 'node:path';
  * directly, so the opt-in suite needs no build step ahead of it.
  */
 const BIN = fileURLToPath(new URL('../../../src/bin.ts', import.meta.url));
+
+/** The MCP server planted in the Sandbox's Bare Config Directory. */
+export const SENTINEL_SERVER = 'ccprofile-integration-sentinel';
 
 /**
  * A machine to run against: a Bare Config Directory, a Profiles Root and a
@@ -21,7 +24,7 @@ const BIN = fileURLToPath(new URL('../../../src/bin.ts', import.meta.url));
  * happen to have open — which would make the assertion a race rather than a
  * fact. A home we own answers the same question and cannot damage theirs.
  */
-export interface Workspace {
+export interface Sandbox {
   /** The temporary directory holding all of it, and the only thing to remove. */
   root: string;
   /** Stands in for `$HOME`: the Bare Config Directory lives beneath it. */
@@ -40,14 +43,23 @@ export interface Output {
 }
 
 /**
- * Builds a Workspace in a temporary directory. Paths are real ones: macOS
- * hands out a symlinked temporary directory, and Claude Code names its
- * `projects/` entry after the resolved path.
+ * Builds a Sandbox in a temporary directory, its Bare Config Directory holding
+ * a `.claude.json` that Claude Code has never seen.
+ *
+ * That it is unmigrated is the point, and worth stating because the opposite
+ * looks more realistic: a `.claude.json` Claude Code has already settled is
+ * left alone even by a Run *without* a Profile — same bytes, same mtime — so
+ * "byte-identical afterwards" would hold whether the Profile isolated anything
+ * or not. An unmigrated file is rewritten the moment Claude Code owns the
+ * directory it is in, which is what makes the assertion able to fail.
+ *
+ * Paths are resolved ones: macOS hands out a symlinked temporary directory,
+ * and Claude Code names its `projects/` entry after the resolved path.
  */
-export async function givenWorkspace(): Promise<Workspace> {
+export async function givenSandbox(): Promise<Sandbox> {
   const tmp = await realpath(await mkdtemp(join(tmpdir(), 'ccprofile-integration-')));
 
-  const workspace: Workspace = {
+  const sandbox: Sandbox = {
     root: tmp,
     home: join(tmp, 'home'),
     bareClaudeJson: join(tmp, 'home', '.claude.json'),
@@ -55,25 +67,27 @@ export async function givenWorkspace(): Promise<Workspace> {
     cwd: join(tmp, 'work'),
   };
 
-  await mkdir(workspace.home);
-  await mkdir(workspace.profilesRoot);
-  await mkdir(workspace.cwd);
+  await mkdir(sandbox.home);
+  await mkdir(sandbox.profilesRoot);
+  await mkdir(sandbox.cwd);
 
-  return workspace;
+  // A user-scope MCP server, which is what makes "the Profile sees none of
+  // them" a claim about isolation rather than about an empty machine. The
+  // command need not exist: `mcp list` reports a server it cannot start.
+  await writeFile(
+    sandbox.bareClaudeJson,
+    `${JSON.stringify(
+      { mcpServers: { [SENTINEL_SERVER]: { command: 'ccprofile-integration-nothing' } } },
+      undefined,
+      2,
+    )}\n`,
+  );
+
+  return sandbox;
 }
 
-export async function removeWorkspace(workspace: Workspace): Promise<void> {
-  await rm(workspace.root, { recursive: true, force: true });
-}
-
-/**
- * Creates a Profile the way a user would — a directory in the Profiles Root
- * and nothing else (ADR-0002) — and answers where it is.
- */
-export async function givenProfile(workspace: Workspace, name: string): Promise<string> {
-  const path = join(workspace.profilesRoot, name);
-  await mkdir(path);
-  return path;
+export async function removeSandbox(sandbox: Sandbox): Promise<void> {
+  await rm(sandbox.root, { recursive: true, force: true });
 }
 
 /**
@@ -82,30 +96,30 @@ export async function givenProfile(workspace: Workspace, name: string): Promise<
  *
  * Nothing here asserts on an exit code, and none is returned. `claude mcp
  * list` was seen to exit `0` and `1` on consecutive identical runs, and
- * `claude -p` against a Profile with no Identity exits non-zero by design;
- * neither says anything about isolation.
+ * `claude -p` against a Profile with no Profile Identity exits non-zero by
+ * design; neither says anything about isolation.
  */
 export function runUnderProfile(
-  workspace: Workspace,
+  sandbox: Sandbox,
   name: string,
   claudeArgs: readonly string[],
 ): Promise<Output> {
-  return capture(process.execPath, [BIN, 'run', name, '--', ...claudeArgs], workspace, {
-    CCP_PROFILES_DIR: workspace.profilesRoot,
+  return capture(process.execPath, [BIN, 'run', name, '--', ...claudeArgs], sandbox, {
+    CCP_PROFILES_DIR: sandbox.profilesRoot,
   });
 }
 
 /**
- * Runs `claude` outside any Profile, against the Workspace's Bare Config
+ * Runs `claude` outside any Profile, against the Sandbox's Bare Config
  * Directory. This is the control: it is what the Run under a Profile is
  * compared against.
  */
-export function runBare(workspace: Workspace, claudeArgs: readonly string[]): Promise<Output> {
-  return capture('claude', claudeArgs, workspace, {});
+export function runBare(sandbox: Sandbox, claudeArgs: readonly string[]): Promise<Output> {
+  return capture('claude', claudeArgs, sandbox, {});
 }
 
 /**
- * Spawns a child in the Workspace and collects what it said.
+ * Spawns a child in the Sandbox and collects what it said.
  *
  * The environment is built rather than inherited, so that a `CLAUDE_CONFIG_DIR`
  * or `CCP_ACTIVE_PROFILE` in the terminal running the suite — the second of
@@ -116,13 +130,13 @@ export function runBare(workspace: Workspace, claudeArgs: readonly string[]): Pr
 function capture(
   command: string,
   args: readonly string[],
-  workspace: Workspace,
+  sandbox: Sandbox,
   extraEnv: Record<string, string>,
 ): Promise<Output> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, [...args], {
-      cwd: workspace.cwd,
-      env: { PATH: process.env.PATH ?? '', HOME: workspace.home, ...extraEnv },
+      cwd: sandbox.cwd,
+      env: { PATH: process.env.PATH ?? '', HOME: sandbox.home, ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -154,13 +168,4 @@ async function entryIs(path: string, predicate: (entry: Stats) => boolean): Prom
   } catch {
     return false;
   }
-}
-
-/**
- * The name Claude Code gives a working directory under `projects/`: its
- * absolute path with every character that is not a letter or a digit replaced
- * by a hyphen.
- */
-export function projectSlug(cwd: string): string {
-  return cwd.replaceAll(/[^a-zA-Z0-9]/g, '-');
 }

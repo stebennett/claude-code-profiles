@@ -118,8 +118,8 @@ The integration suite is deliberately not among them. It launches a real
 `claude` under a throwaway Profile and checks the mechanism the whole tool
 rests on ([ADR-0001](./docs/adr/0001-directory-swap-via-claude-config-dir.md)):
 `.claude.json`, `projects/`, `sessions/` and `backups/` are created inside the
-Profile, MCP servers configured outside it are invisible within it, and the
-`.claude.json` beside `$HOME` is byte-identical afterwards. It needs no Claude
+Profile, MCP servers configured outside it are invisible within it, and
+`$HOME/.claude.json` is byte-identical afterwards. It needs no Claude
 account — everything it asserts happens before Claude Code asks for one — and
 it runs against a temporary home of its own, so your configuration is neither
 read nor written. Exit codes are never asserted on: `claude` returns them

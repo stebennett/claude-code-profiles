@@ -1,19 +1,19 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { givenProfile } from '../support/profiles.ts';
 import {
   directoryExists,
   fileExists,
-  givenProfile,
-  givenWorkspace,
-  projectSlug,
-  removeWorkspace,
+  givenSandbox,
+  removeSandbox,
   runBare,
   runUnderProfile,
-  type Workspace,
-} from './support/workspace.ts';
+  SENTINEL_SERVER,
+  type Sandbox,
+} from './support/sandbox.ts';
 
 /**
  * The mechanism ADR-0001 rests on, held against a real `claude`: pointing
@@ -26,60 +26,48 @@ import {
  */
 
 /**
- * A command that boots Claude Code far enough to initialise a Config
- * Directory. `claude --version` short-circuits and initialises nothing;
- * `claude -p` boots the app, and against a Profile with no Profile Identity it
- * stops at "Not logged in", having already written the directory. That stop is
- * the isolation working: the Profile does not hold the account the Bare Config
- * Directory does.
+ * Arguments that boot Claude Code far enough to initialise a Config Directory.
+ * `claude --version` short-circuits and initialises nothing; `claude -p` boots
+ * the app, and against a Profile with no Profile Identity it stops at "Not
+ * logged in", having already written the directory. That stop is the isolation
+ * working: the Profile does not hold the account the Bare Config Directory
+ * does.
  */
-const BOOT = ['-p', 'hello'];
+const BOOT_ARGS = ['-p', 'hello'];
 
-/** What a Bare Config Directory that has been used looks like, near enough. */
-const BARE_CLAUDE_JSON = `${JSON.stringify(
-  {
-    // A user-scope MCP server, which is what makes "the Profile sees none of
-    // them" a claim about isolation rather than about an empty machine.
-    mcpServers: { 'ccprofile-integration-sentinel': { command: 'ccprofile-integration-nothing' } },
-  },
-  undefined,
-  2,
-)}\n`;
-
-let workspace: Workspace;
+let sandbox: Sandbox;
 
 beforeEach(async () => {
-  workspace = await givenWorkspace();
-  await writeFile(workspace.bareClaudeJson, BARE_CLAUDE_JSON);
+  sandbox = await givenSandbox();
 });
 
 afterEach(async () => {
-  await removeWorkspace(workspace);
+  await removeSandbox(sandbox);
 });
 
 describe('a Run against a throwaway Profile', () => {
   it('writes .claude.json inside the Profile', async () => {
-    const profile = await givenProfile(workspace, 'throwaway');
+    const profile = await givenProfile(sandbox.profilesRoot, 'throwaway');
 
-    await runUnderProfile(workspace, 'throwaway', BOOT);
+    await runUnderProfile(sandbox, 'throwaway', BOOT_ARGS);
 
     await expect(fileExists(join(profile, '.claude.json'))).resolves.toBe(true);
   });
 
   it('leaves the Bare Config Directory .claude.json byte-identical', async () => {
-    await givenProfile(workspace, 'throwaway');
-    const before = await readFile(workspace.bareClaudeJson);
+    await givenProfile(sandbox.profilesRoot, 'throwaway');
+    const before = await readFile(sandbox.bareClaudeJson);
 
-    await runUnderProfile(workspace, 'throwaway', BOOT);
+    await runUnderProfile(sandbox, 'throwaway', BOOT_ARGS);
 
-    const after = await readFile(workspace.bareClaudeJson);
+    const after = await readFile(sandbox.bareClaudeJson);
     expect(after.equals(before)).toBe(true);
   });
 
   it('creates its projects, sessions and backups inside the Profile', async () => {
-    const profile = await givenProfile(workspace, 'throwaway');
+    const profile = await givenProfile(sandbox.profilesRoot, 'throwaway');
 
-    await runUnderProfile(workspace, 'throwaway', BOOT);
+    await runUnderProfile(sandbox, 'throwaway', BOOT_ARGS);
 
     for (const directory of ['projects', 'sessions', 'backups']) {
       await expect(
@@ -88,22 +76,23 @@ describe('a Run against a throwaway Profile', () => {
       ).resolves.toBe(true);
     }
 
-    // The project stamped is the directory the Run was launched from, which is
-    // what says the Profile is recording this session rather than inheriting
-    // somebody else's history.
-    await expect(
-      directoryExists(join(profile, 'projects', projectSlug(workspace.cwd))),
-    ).resolves.toBe(true);
+    // One project, and it is the directory this Run was launched from: the
+    // Profile is recording this session rather than inheriting a history from
+    // anywhere else. How Claude Code spells the path as a directory name is
+    // its own business, so only the tail is matched.
+    await expect(readdir(join(profile, 'projects'))).resolves.toEqual([
+      expect.stringMatching(/work$/),
+    ]);
   });
 
   it('sees none of the MCP servers the Bare Config Directory has', async () => {
-    await givenProfile(workspace, 'throwaway');
+    await givenProfile(sandbox.profilesRoot, 'throwaway');
 
-    const underProfile = await runUnderProfile(workspace, 'throwaway', ['mcp', 'list']);
-    const outside = await runBare(workspace, ['mcp', 'list']);
+    const underProfile = await runUnderProfile(sandbox, 'throwaway', ['mcp', 'list']);
+    const outside = await runBare(sandbox, ['mcp', 'list']);
 
     expect(underProfile.stdout).toContain('No MCP servers configured');
-    expect(underProfile.stdout).not.toContain('ccprofile-integration-sentinel');
-    expect(outside.stdout).toContain('ccprofile-integration-sentinel');
+    expect(underProfile.stdout).not.toContain(SENTINEL_SERVER);
+    expect(outside.stdout).toContain(SENTINEL_SERVER);
   });
 });
