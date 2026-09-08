@@ -18,7 +18,7 @@ The cost is that a release needs the token to exist, and that a failed publish i
 
 **Releasing is: bump the version, merge, tag, push the tag.** The workflow refuses a tag whose version disagrees with `package.json`, so the two cannot drift apart unnoticed.
 
-**A one-time setup is required, and it is not in this repository.** A granular npm access token with publish rights for `ccprofile`, stored as the `NPM_TOKEN` repository secret. The `npm-publish` environment the workflow names exists so a reviewer-approval rule can be added to publishes without gating anything else.
+**A one-time setup is required, and it is not in this repository.** A granular npm access token with publish rights for `@nyxcoder/ccprofile` (the name is scoped: see [ADR-0005](./0005-scoped-npm-name-unscoped-command.md)), stored as the `NPM_TOKEN` repository secret. The `npm-publish` environment the workflow names exists so a reviewer-approval rule can be added to publishes without gating anything else.
 
 **The first publish is the awkward one.** npm's trusted publishing (OIDC, no stored token) is the better end state, but it is configured against a package that already exists. So this release uses a token, and moving to a trusted publisher afterwards is a change to this workflow alone — the `id-token: write` permission it already requests for provenance is the same one trusted publishing needs.
 

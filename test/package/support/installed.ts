@@ -9,6 +9,15 @@ import { type Spawned, spawnCapturing } from '../../support/spawn.ts';
 const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /**
+ * The published name, which is scoped and so is two path segments inside an
+ * install. It is not the command name: see ADR-0005.
+ */
+const PACKAGE_NAME = ['@nyxcoder', 'ccprofile'];
+
+/** The command the package installs, which is what a user actually types. */
+const COMMAND = 'ccprofile';
+
+/**
  * The fields of the installed `package.json` this suite has something to say
  * about. Declared rather than left as `unknown` so the assertions read as
  * field accesses; a field npm did not publish arrives as `undefined` and the
@@ -25,6 +34,7 @@ export interface Manifest {
   engines: Record<string, string>;
   files: string[];
   repository: { type: string; url: string };
+  publishConfig: { access: string };
 }
 
 /** The part of `npm pack --json` that matters here. */
@@ -84,7 +94,7 @@ export async function givenInstalledPackage(): Promise<Installed> {
   await npm(['install', '--global', '--prefix', prefix, tarball]);
 
   const manifest = JSON.parse(
-    await readFile(join(prefix, 'lib', 'node_modules', 'ccprofile', 'package.json'), 'utf8'),
+    await readFile(join(prefix, 'lib', 'node_modules', ...PACKAGE_NAME, 'package.json'), 'utf8'),
   ) as Manifest;
 
   return {
@@ -111,7 +121,7 @@ export function runOnPath(
   args: string[],
   extraEnv: Record<string, string> = {},
 ): Promise<Spawned> {
-  return spawnCapturing('ccprofile', args, {
+  return spawnCapturing(COMMAND, args, {
     env: { ...childEnv(installed, `${installed.binDir}${delimiter}`), ...extraEnv },
   });
 }
@@ -124,10 +134,12 @@ export function runOnPath(
  * `--package` names the tarball and `ccprofile` the command to run out of it,
  * rather than `npx <tarball>`, which npx reads as a local executable to run
  * and refuses. Naming the command has the better shape here anyway: it is the
- * `bin` entry being resolved, which is what `npx ccprofile` relies on.
+ * `bin` entry being resolved, and with a scoped package whose command differs
+ * from its name, that resolution is exactly what `npx @nyxcoder/ccprofile`
+ * depends on.
  */
 export function runViaNpx(installed: Installed, args: string[]): Promise<Spawned> {
-  return spawnCapturing('npx', ['--yes', '--package', installed.tarball, 'ccprofile', ...args], {
+  return spawnCapturing('npx', ['--yes', '--package', installed.tarball, COMMAND, ...args], {
     env: childEnv(installed, ''),
   });
 }

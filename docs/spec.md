@@ -10,7 +10,7 @@ Keep several independent Claude Code configurations on one machine and launch Cl
 
 ## Package
 
-- npm package: `ccprofile`. Binary: `ccprofile`. Repository name (`claude-code-profiles`) is unchanged.
+- npm package: `@nyxcoder/ccprofile`. Binary: `ccprofile`. Repository name (`claude-code-profiles`) is unchanged. The package is scoped and the binary is not; see [ADR-0005](./adr/0005-scoped-npm-name-unscoped-command.md).
 - Node 22+, ESM only, TypeScript.
 - macOS and Linux. Windows is out of scope for 1.0, but no platform-specific path handling is hardcoded (see [Seams](#library-cli-seam)).
 - `npx ccprofile` supported. No standalone binary in 1.0.
