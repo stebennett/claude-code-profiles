@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works; what remains before 1.0 is the guard on a `CLAUDE_CONFIG_DIR` you set yourself (with its `-y`/`--yes` bypass), an integration test against a real `claude`, and packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works, and a `CLAUDE_CONFIG_DIR` you set yourself is now asked about before a Run overrides it. What remains before 1.0 is an integration test against a real `claude`, and packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
 
 ## Why
 
@@ -46,6 +46,21 @@ Because a Profile is selected by an environment variable at launch, two terminal
 
 The trade-off: a Profile is chosen when Claude Code starts. Claude Code reads its configuration at session start, so switching Profile means starting a new session.
 
+## If you set `CLAUDE_CONFIG_DIR` yourself
+
+Setting that variable by hand is a deliberate act, so a Run tells you before overriding it:
+
+```
+$ ccprofile run work
+ccprofile: CLAUDE_CONFIG_DIR is set to /Users/you/claude-experiment
+This Run overrides it with the Profile 'work' at /Users/you/.claude/profiles/work
+Override it? [y/N]
+```
+
+It defaults to **no**, so a stray keypress cannot discard your setup. `-y`/`--yes` skips the question, and with no terminal to ask on — a script, a CI job — the Run fails saying so rather than hanging or guessing.
+
+The prompt is rare by design: inside a Run the variable is one `ccprofile` set, and being asked about the tool's own doing would make the question routine, and so unread.
+
 ## Install
 
 ```bash
@@ -59,7 +74,7 @@ Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues
 | Command | Does |
 |---|---|
 | `ccprofile new <name> [--no-launch]` | Create a Profile and launch it (so you can log in) |
-| `ccprofile run [name] [-- args…]` | Launch Claude Code under a Profile, forwarding `args` to `claude` |
+| `ccprofile run [name] [-y] [-- args…]` | Launch Claude Code under a Profile, forwarding `args` to `claude` |
 | `ccprofile list [--json]` | List Profiles with their account and last-used time |
 | `ccprofile current` | Which Profile this session is running under |
 | `ccprofile path <name>` | Absolute path to a Profile |
@@ -97,13 +112,18 @@ npm run build        # tsc → dist/
 
 CI runs those four on every push and pull request, on Node 22 across Linux and macOS.
 
-Everything is tested through one seam: `runCli(argv, deps)`, with only the
+Almost everything is tested through one seam: `runCli(argv, deps)`, with only the
 unmockable effects injected — `env`, `cwd`, `homeDir`, `stdout`, `stderr`,
 `isTTY`, `now`, `confirm` and `launch`. `launch` is the load-bearing one: a Run
 replaces the process, so tests assert what *would* have been executed and with
 which environment, rather than spawning Claude Code. `now` is what makes
 `list`'s relative times a fact rather than a race. `src/process-deps.ts`
 wires the real process effects in for the actual binary.
+
+The one exception is `src/yes-no.ts`, tested directly. Faking `confirm` at the
+seam is what puts the *default* of the `y/N` prompt beyond it, and "an empty
+answer means no" guards configuration the user set on purpose, so it is worth
+a test rather than a promise.
 
 Profiles themselves are real directories in a real temporary Profiles Root, so
 the filesystem is exercised rather than faked; `test/support/profiles.ts`

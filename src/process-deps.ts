@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 
 import type { CliDeps } from './deps.ts';
+import { saidYes } from './yes-no.ts';
 
 /** Wires the real process effects into the shape `runCli` consumes. */
 export function processDeps(): CliDeps {
@@ -28,12 +29,17 @@ function stdinIsTTY(): boolean {
   return (process.stdin as { isTTY?: boolean }).isTTY ?? false;
 }
 
-/** Prompts on the terminal, defaulting to no on an empty or unrecognised answer. */
+/**
+ * Prompts on the terminal, defaulting to no on an empty or unrecognised
+ * answer. The `[y/N]` here and `saidYes` are two halves of one promise: the
+ * capital N is only honest because every answer but yes declines.
+ *
+ * Asking on stderr keeps stdout free of anything a caller might be reading.
+ */
 async function askYesNo(question: string): Promise<boolean> {
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    const answer = await rl.question(`${question} [y/N] `);
-    return /^y(es)?$/i.test(answer.trim());
+    return saidYes(await rl.question(`${question} [y/N] `));
   } finally {
     rl.close();
   }
