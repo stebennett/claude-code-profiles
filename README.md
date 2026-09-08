@@ -162,22 +162,33 @@ would.
 
 ## Releasing
 
-Publishing happens in CI, not on anyone's machine. A pushed `v*` tag runs the
-release workflow, which requires the full CI matrix to pass and then publishes
-with provenance ([ADR-0004](./docs/adr/0004-publish-to-npm-from-ci.md)):
+Publishing happens in CI, not on anyone's machine, and no credential is stored
+anywhere: npm authenticates the release workflow itself over OIDC. A pushed
+`v*` tag requires the full CI matrix to pass and then *stages* the version —
+a human releases it ([ADR-0004](./docs/adr/0004-publish-to-npm-from-ci.md)):
 
 ```bash
 npm version 1.0.1        # commits the bump and tags it
 git push && git push --tags
 ```
 
-The workflow refuses a tag whose version disagrees with `package.json`, so the
-tag and what npm serves cannot drift apart. It needs one thing this repository
-cannot hold: an npm granular access token with publish rights for
-`@nyxcoder/ccprofile`, stored as the `NPM_TOKEN` repository secret.
+Then approve what it staged, which is the step that needs 2FA:
 
-`publishConfig.access` is `public` because a scoped package is private by
-default, and for this one that default would be a silent failure to release
+```bash
+npm stage list @nyxcoder/ccprofile
+npm stage approve <stage-id>
+```
+
+The workflow prints those two commands in its job summary, refuses a tag whose
+version disagrees with `package.json`, and skips a version already on the
+registry — so re-running a tag is harmless. `npm stage` needs npm 11.15+;
+`npx npm@11 stage …` works without upgrading anything.
+
+Two things worth knowing before touching any of it. The trusted publisher on
+npm matches this repository, the workflow **filename** and the `npm-publish`
+environment literally, so renaming either breaks releases until npm's side is
+changed to match. And `publishConfig.access` is `public` because a scoped
+package is private by default, which here would be a silent failure to release
 rather than a visible one.
 
 ## Documentation
