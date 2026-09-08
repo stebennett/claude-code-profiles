@@ -45,10 +45,15 @@ describe('the published package metadata', () => {
   it('carries everything npm and a reader need', () => {
     const { manifest } = installed;
 
-    expect(manifest.name).toBe('ccprofile');
+    expect(manifest.name).toBe('@nyxcoder/ccprofile');
     expect(manifest.type).toBe('module');
     expect(manifest.license).toBe('MIT');
+    // The scope is where the package lives; `ccprofile` is what a user types.
+    // Renaming the package must not rename the command.
     expect(manifest.bin).toEqual({ ccprofile: 'dist/bin.js' });
+    // A scoped package publishes private by default, which for this one would
+    // be a silent failure to release rather than a visible one.
+    expect(manifest.publishConfig).toEqual({ access: 'public' });
     expect(manifest.engines).toEqual({ node: '>=22' });
     expect(manifest.files).toEqual(['dist']);
     expect(manifest.description).toContain('Claude Code');

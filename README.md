@@ -64,8 +64,12 @@ The prompt is rare by design: inside a Run the variable is one `ccprofile` set, 
 ## Install
 
 ```bash
-npm install -g ccprofile     # or: npx ccprofile
+npm install -g @nyxcoder/ccprofile     # or: npx @nyxcoder/ccprofile
 ```
+
+**The command is `ccprofile`.** The package is scoped because npm refuses the
+unscoped name as too similar to an unrelated package; what you type is
+unaffected ([ADR-0005](./docs/adr/0005-scoped-npm-name-unscoped-command.md)).
 
 Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues).
 
@@ -169,8 +173,12 @@ git push && git push --tags
 
 The workflow refuses a tag whose version disagrees with `package.json`, so the
 tag and what npm serves cannot drift apart. It needs one thing this repository
-cannot hold: an npm granular access token with publish rights for `ccprofile`,
-stored as the `NPM_TOKEN` repository secret.
+cannot hold: an npm granular access token with publish rights for
+`@nyxcoder/ccprofile`, stored as the `NPM_TOKEN` repository secret.
+
+`publishConfig.access` is `public` because a scoped package is private by
+default, and for this one that default would be a silent failure to release
+rather than a visible one.
 
 ## Documentation
 
