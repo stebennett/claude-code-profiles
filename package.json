@@ -1,6 +1,6 @@
 {
   "name": "@nyxcoder/ccprofile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Run Claude Code under separate, fully isolated configurations — one per area of work.",
   "keywords": [
     "claude",
