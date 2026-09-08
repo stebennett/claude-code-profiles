@@ -15,6 +15,37 @@ export function profileNotFound(name: string, profilesRoot: string): string {
   );
 }
 
+/**
+ * No Default Profile is set, which both `default` and a bare `run` report.
+ * Neither can do anything about it, and both answers end in the same advice.
+ */
+export function noDefaultProfile(): string {
+  return `ccprofile: no Default Profile set\nSet one with: ccprofile default <name>\n`;
+}
+
+/**
+ * The Default Profile names a Profile that is no longer there. Worded away
+ * from `profileNotFound` because the user named nothing: telling them a
+ * Profile they did not type is missing would explain neither what happened nor
+ * what to do about it.
+ */
+export function defaultProfileMissing(name: string, profilesRoot: string): string {
+  return (
+    `ccprofile: the Default Profile '${name}' is no longer in ${profilesRoot}\n` +
+    `Set another with: ccprofile default <name>\n`
+  );
+}
+
+/**
+ * A name that is not a valid Profile name. The reason comes from
+ * `profileNameError`, which every command asks and none words itself: the
+ * prefix is the only part that was ever the command's, and it is identical in
+ * all four.
+ */
+export function profileNameRejected(reason: string): string {
+  return `ccprofile: ${reason}\n`;
+}
+
 /** An argument in a Profile name's place that is plainly an option instead. */
 export function unknownOption(option: string): string {
   return `ccprofile: unknown option '${option}'\n\n${USAGE}`;
