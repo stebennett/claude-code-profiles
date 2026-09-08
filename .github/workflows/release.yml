@@ -1,0 +1,61 @@
+name: Release
+
+# Publishing is a push of a version tag and nothing else: no laptop, no
+# personal npm login, and no way to publish a tree that is not in the
+# repository. See docs/adr/0004-publish-to-npm-from-ci.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The same checks every push gets, on both platforms — including the
+  # packaging suite, which packs the package and runs the installed binary. A
+  # tag whose checks fail publishes nothing.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Provenance: npm records which workflow, at which commit, built the
+      # tarball, and that record is public on the package page.
+      id-token: write
+    # Named so that a reviewer-approval rule can be added to publishes alone,
+    # without gating any other job.
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # The tag is what a reader of the repository sees, and `package.json` is
+      # what npm serves. A release where they disagree is a release nobody can
+      # reason about later, so it fails here rather than being published.
+      - name: The tag names the version being published
+        run: |
+          tagged="${GITHUB_REF_NAME#v}"
+          declared="$(node -p 'require("./package.json").version')"
+          if [ "$tagged" != "$declared" ]; then
+            echo "tag $GITHUB_REF_NAME is version $tagged, package.json declares $declared" >&2
+            exit 1
+          fi
+
+      # `prepack` builds, so what is uploaded is built from this commit.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

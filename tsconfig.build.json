@@ -4,7 +4,12 @@
     "noEmit": false,
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": true,
+
+    // No declarations: the package has a `bin` and no `exports`, so nothing
+    // outside it can import the module seam and nothing needs its types. The
+    // seam's other consumer, if a TUI ever arrives, lives in this repository
+    // and reads `src/`. Source maps stay — they cost a user nothing and make a
+    // stack trace in a bug report point at a real line.
     "sourceMap": true
   },
   "include": ["src"]
