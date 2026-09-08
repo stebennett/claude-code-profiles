@@ -1,7 +1,18 @@
 {
-  "name": "ccprofile",
-  "version": "0.0.0",
+  "name": "@nyxcoder/ccprofile",
+  "version": "1.0.1",
   "description": "Run Claude Code under separate, fully isolated configurations — one per area of work.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "profile",
+    "profiles",
+    "multi-account",
+    "isolation",
+    "cli",
+    "mcp",
+    "anthropic"
+  ],
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -13,16 +24,26 @@
   "engines": {
     "node": ">=22"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:package": "vitest run -c vitest.package.config.ts",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stebennett/claude-code-profiles.git"
+  },
+  "homepage": "https://github.com/stebennett/claude-code-profiles#readme",
+  "bugs": {
+    "url": "https://github.com/stebennett/claude-code-profiles/issues"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

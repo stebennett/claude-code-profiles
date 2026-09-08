@@ -1,0 +1,108 @@
+name: Release
+
+# Publishing is a push of a version tag and nothing else: no laptop, no
+# personal npm login, and no stored credential of any kind — the registry
+# trusts this workflow by name, over OIDC. What a tag produces is a *staged*
+# version, which a human then approves with 2FA; nothing reaches the registry
+# unattended. See docs/adr/0004-publish-to-npm-from-ci.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The same checks every push gets, on both platforms — including the
+  # packaging suite, which packs the package and runs the installed binary. A
+  # tag whose checks fail stages nothing.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  stage:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The whole of the authentication: npm exchanges this for a short-lived
+      # publish credential, having matched this repository, this workflow file
+      # and the environment below against the package's trusted publisher.
+      id-token: write
+    # Registered in the trusted publisher configuration, so renaming it here
+    # breaks the release until npm's side is changed to match. It is also
+    # where a reviewer-approval rule can be added to releases alone.
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 for npm's sake, not the package's: staged publishing needs npm
+      # 11.15+ and trusted publishing needs 11.5.1+, while the Node 22 the
+      # `verify` matrix tests against ships npm 10. The package's own floor is
+      # Node 22, and that is what `verify` holds it to.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Whatever npm the runner's Node bundles may be older than the floor
+      # above, so the version this needs is installed rather than assumed.
+      - run: npm install --global npm@^11
+
+      - run: npm ci
+
+      # The tag is what a reader of the repository sees, and `package.json` is
+      # what npm serves. A release where they disagree is a release nobody can
+      # reason about later, so it fails here rather than being staged.
+      - name: The tag names the version being released
+        id: version
+        run: |
+          tagged="${GITHUB_REF_NAME#v}"
+          declared="$(node -p 'require("./package.json").version')"
+          if [ "$tagged" != "$declared" ]; then
+            echo "tag $GITHUB_REF_NAME is version $tagged, package.json declares $declared" >&2
+            exit 1
+          fi
+          echo "version=$declared" >> "$GITHUB_OUTPUT"
+          echo "name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
+
+      # 1.0.0 was published by hand, before this workflow existed and before a
+      # trusted publisher could be configured against a package that did not
+      # yet exist (ADR-0004). Tagging it afterwards should record that release,
+      # not fail on it — and re-running a tag should be a no-op rather than an
+      # error. An immutable registry makes "already there" a success.
+      - name: Whether this version is already on the registry
+        id: registry
+        run: |
+          spec="${{ steps.version.outputs.name }}@${{ steps.version.outputs.version }}"
+          if [ -n "$(npm view "$spec" version 2>/dev/null || true)" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$spec is already published; nothing to stage." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `prepack` builds, so what is uploaded is built from this commit. No
+      # `--provenance`: with trusted publishing npm attests automatically, and
+      # no `NODE_AUTH_TOKEN`, because there is no token.
+      - if: steps.registry.outputs.published == 'false'
+        run: npm stage publish
+
+      - if: steps.registry.outputs.published == 'false'
+        name: Say what a human still has to do
+        run: |
+          {
+            echo "### Staged, not published"
+            echo
+            echo "\`${{ steps.version.outputs.name }}@${{ steps.version.outputs.version }}\` is staged and needs a human with 2FA to release it:"
+            echo
+            echo '```'
+            echo "npm stage list ${{ steps.version.outputs.name }}"
+            echo "npm stage approve <stage-id>"
+            echo '```'
+            echo
+            echo "Or approve it in the Staged Packages tab on npmjs.com. Staged versions can only be approved once malware scanning finishes."
+          } >> "$GITHUB_STEP_SUMMARY"

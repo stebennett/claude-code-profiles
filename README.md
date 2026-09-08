@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works; what remains before 1.0 is the guard on a `CLAUDE_CONFIG_DIR` you set yourself (with its `-y`/`--yes` bypass), an integration test against a real `claude`, and packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: 1.0. Every command in the table below works, a `CLAUDE_CONFIG_DIR` you set yourself is asked about before a Run overrides it, and isolation itself is covered by an integration test against a real `claude` (`npm run test:integration`). Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8). What is deliberately left out is [below](#deliberately-not-included).
 
 ## Why
 
@@ -46,20 +46,41 @@ Because a Profile is selected by an environment variable at launch, two terminal
 
 The trade-off: a Profile is chosen when Claude Code starts. Claude Code reads its configuration at session start, so switching Profile means starting a new session.
 
+## If you set `CLAUDE_CONFIG_DIR` yourself
+
+Setting that variable by hand is a deliberate act, so a Run tells you before overriding it:
+
+```
+$ ccprofile run work
+ccprofile: CLAUDE_CONFIG_DIR is set to /Users/you/claude-experiment
+This Run overrides it with the Profile 'work' at /Users/you/.claude/profiles/work
+Override it? [y/N]
+```
+
+It defaults to **no**, so a stray keypress cannot discard your setup. `-y`/`--yes` skips the question, and with no terminal to ask on — a script, a CI job — the Run fails saying so rather than hanging or guessing.
+
+The prompt is rare by design: inside a Run the variable is one `ccprofile` set, and being asked about the tool's own doing would make the question routine, and so unread.
+
 ## Install
 
 ```bash
-npm install -g ccprofile     # or: npx ccprofile
+npm install -g @nyxcoder/ccprofile     # or: npx @nyxcoder/ccprofile
 ```
 
+**The command is `ccprofile`.** The package is scoped because npm refuses the
+unscoped name as too similar to an unrelated package; what you type is
+unaffected ([ADR-0005](./docs/adr/0005-scoped-npm-name-unscoped-command.md)).
+
 Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues).
+
+Both install routes are checked on every push, on both of those platforms: CI packs the package, installs it globally, runs the installed binary, and runs the tarball through `npx` (`npm run test:package`). The Node floor is declared in `engines` rather than tested — CI runs Node 22 and nothing older.
 
 ## Commands
 
 | Command | Does |
 |---|---|
 | `ccprofile new <name> [--no-launch]` | Create a Profile and launch it (so you can log in) |
-| `ccprofile run [name] [-- args…]` | Launch Claude Code under a Profile, forwarding `args` to `claude` |
+| `ccprofile run [name] [-y] [-- args…]` | Launch Claude Code under a Profile, forwarding `args` to `claude` |
 | `ccprofile list [--json]` | List Profiles with their account and last-used time |
 | `ccprofile current` | Which Profile this session is running under |
 | `ccprofile path <name>` | Absolute path to a Profile |
@@ -93,11 +114,35 @@ npm run typecheck    # tsc, source and tests
 npm run lint         # eslint
 npm test             # vitest — no claude on PATH, no credentials, no network
 npm run build        # tsc → dist/
+npm run test:package # packs, installs globally into a throwaway prefix, runs it
+
+npm run test:integration   # opt-in: needs Claude Code installed and on PATH
 ```
 
-CI runs those four on every push and pull request, on Node 22 across Linux and macOS.
+CI runs all five on every push and pull request, on Node 22 across Linux and macOS.
 
-Everything is tested through one seam: `runCli(argv, deps)`, with only the
+`test:package` is the one that costs seconds rather than milliseconds, and it
+is in CI anyway: the matrix is the only honest way to claim the package
+installs and runs on both platforms. Everything it asserts is asserted against
+the tarball `npm pack` produced — the package metadata, that the tarball holds
+the built entry point and nothing a user does not need to run it, that the
+installed `ccprofile` on `PATH` prints its usage and creates and lists a
+Profile, and that `npx` can run it too. It needs no `claude`: `--no-launch` is
+what keeps it from wanting one. It writes only to a temporary prefix, home and
+Profiles Root, so it cannot install over a `ccprofile` you have.
+
+The integration suite is deliberately not among them. It launches a real
+`claude` under a throwaway Profile and checks the mechanism the whole tool
+rests on ([ADR-0001](./docs/adr/0001-directory-swap-via-claude-config-dir.md)):
+`.claude.json`, `projects/`, `sessions/` and `backups/` are created inside the
+Profile, MCP servers configured outside it are invisible within it, and
+`$HOME/.claude.json` is byte-identical afterwards. It needs no Claude
+account — everything it asserts happens before Claude Code asks for one — and
+it runs against a temporary home of its own, so your configuration is neither
+read nor written. Exit codes are never asserted on: `claude` returns them
+inconsistently here, and they say nothing about isolation.
+
+Almost everything is tested through one seam: `runCli(argv, deps)`, with only the
 unmockable effects injected — `env`, `cwd`, `homeDir`, `stdout`, `stderr`,
 `isTTY`, `now`, `confirm` and `launch`. `launch` is the load-bearing one: a Run
 replaces the process, so tests assert what *would* have been executed and with
@@ -105,16 +150,52 @@ which environment, rather than spawning Claude Code. `now` is what makes
 `list`'s relative times a fact rather than a race. `src/process-deps.ts`
 wires the real process effects in for the actual binary.
 
+The one exception is `src/yes-no.ts`, tested directly. Faking `confirm` at the
+seam is what puts the *default* of the `y/N` prompt beyond it, and "an empty
+answer means no" guards configuration the user set on purpose, so it is worth
+a test rather than a promise.
+
 Profiles themselves are real directories in a real temporary Profiles Root, so
 the filesystem is exercised rather than faked; `test/support/profiles.ts`
 creates them — and plants the tool's own state — the way a user or Claude Code
 would.
 
+## Releasing
+
+Publishing happens in CI, not on anyone's machine, and no credential is stored
+anywhere: npm authenticates the release workflow itself over OIDC. A pushed
+`v*` tag requires the full CI matrix to pass and then *stages* the version —
+a human releases it ([ADR-0004](./docs/adr/0004-publish-to-npm-from-ci.md)):
+
+```bash
+npm version 1.0.1        # commits the bump and tags it
+git push && git push --tags
+```
+
+Then approve what it staged, which is the step that needs 2FA:
+
+```bash
+npm stage list @nyxcoder/ccprofile
+npm stage approve <stage-id>
+```
+
+The workflow prints those two commands in its job summary, refuses a tag whose
+version disagrees with `package.json`, and skips a version already on the
+registry — so re-running a tag is harmless. `npm stage` needs npm 11.15+;
+`npx npm@11 stage …` works without upgrading anything.
+
+Two things worth knowing before touching any of it. The trusted publisher on
+npm matches this repository, the workflow **filename** and the `npm-publish`
+environment literally, so renaming either breaks releases until npm's side is
+changed to match. And `publishConfig.access` is `public` because a scoped
+package is private by default, which here would be a silent failure to release
+rather than a visible one.
+
 ## Documentation
 
 - [`docs/spec.md`](./docs/spec.md) — the specification
 - [`CONTEXT.md`](./CONTEXT.md) — glossary
-- [`docs/adr/`](./docs/adr/) — why it is built this way
+- [`docs/adr/`](./docs/adr/) — why it is built this way, publishing included
 
 ## Prior art
 
