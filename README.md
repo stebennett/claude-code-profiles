@@ -4,7 +4,7 @@ Run Claude Code under separate, fully isolated configurations — one per area o
 
 Like `AWS_PROFILE` for the AWS CLI, but for Claude Code: `ccprofile run work` and `ccprofile run personal` launch two Claude Codes that share nothing. Different MCP servers, different skills and agents, different plugins, different memory, different permissions — and **different Claude accounts**.
 
-> Status: in development. `ccprofile new <name>`, `ccprofile run [name]`, `ccprofile list`, `ccprofile path <name>`, `ccprofile current` and `ccprofile default [name]` work today, so a Profile can be created, logged in to, used, listed, located, identified and made the one a bare `ccprofile run` launches. Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. Every command in the table below now works, and a `CLAUDE_CONFIG_DIR` you set yourself is now asked about before a Run overrides it. Isolation itself is now covered by an integration test against a real `claude` (`npm run test:integration`). What remains before 1.0 is packaging for publish. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8).
+> Status: 1.0. Every command in the table below works, a `CLAUDE_CONFIG_DIR` you set yourself is asked about before a Run overrides it, and isolation itself is covered by an integration test against a real `claude` (`npm run test:integration`). Directories you create by hand (`mkdir -p ~/.claude/profiles/work`) are Profiles too — one needs nothing but its name and its place in the Profiles Root. See [`docs/spec.md`](./docs/spec.md) and the [implementation checklist](../../issues/8). What is deliberately left out is [below](#deliberately-not-included).
 
 ## Why
 
@@ -69,6 +69,8 @@ npm install -g ccprofile     # or: npx ccprofile
 
 Node 22+. macOS and Linux; Windows support is [tracked as an issue](../../issues).
 
+Both of those are checked on every push, on both platforms: CI packs the package, installs it globally, and runs the installed binary (`npm run test:package`).
+
 ## Commands
 
 | Command | Does |
@@ -108,11 +110,20 @@ npm run typecheck    # tsc, source and tests
 npm run lint         # eslint
 npm test             # vitest — no claude on PATH, no credentials, no network
 npm run build        # tsc → dist/
+npm run test:package # packs, installs globally into a throwaway prefix, runs it
 
 npm run test:integration   # opt-in: needs Claude Code installed and on PATH
 ```
 
-CI runs the first four on every push and pull request, on Node 22 across Linux and macOS.
+CI runs all five on every push and pull request, on Node 22 across Linux and macOS.
+
+`test:package` is the one that costs seconds rather than milliseconds, and it
+is in CI anyway: the matrix is the only honest way to claim the package
+installs and runs on both platforms. Everything it asserts is asserted against
+the tarball `npm pack` produced — the package metadata, that the tarball holds
+the built entry point and nothing a user does not need to run it, and that the
+installed `ccprofile` on `PATH` prints its usage and creates and lists a
+Profile. It needs no `claude`: `--no-launch` is what keeps it from wanting one.
 
 The integration suite is deliberately not among them. It launches a real
 `claude` under a throwaway Profile and checks the mechanism the whole tool

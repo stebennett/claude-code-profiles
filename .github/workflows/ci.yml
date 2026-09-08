@@ -40,3 +40,9 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+      # Packs the package and installs it globally into a prefix of its own,
+      # then runs the installed binary. This matrix is what makes "installs
+      # and runs on macOS and Linux" a fact rather than a claim, so unlike the
+      # real-`claude` suite it belongs here.
+      - run: npm run test:package
