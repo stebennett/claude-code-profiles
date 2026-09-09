@@ -43,7 +43,7 @@ jobs:
       # 11.15+ and trusted publishing needs 11.5.1+, while the Node 22 the
       # `verify` matrix tests against ships npm 10. The package's own floor is
       # Node 22, and that is what `verify` holds it to.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
