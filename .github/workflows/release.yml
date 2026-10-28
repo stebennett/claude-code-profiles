@@ -45,7 +45,7 @@ jobs:
       # Node 22, and that is what `verify` holds it to.
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           registry-url: 'https://registry.npmjs.org'
 
       # Whatever npm the runner's Node bundles may be older than the floor
