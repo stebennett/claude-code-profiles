@@ -37,13 +37,13 @@ jobs:
     # where a reviewer-approval rule can be added to releases alone.
     environment: npm-publish
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Node 24 for npm's sake, not the package's: staged publishing needs npm
       # 11.15+ and trusted publishing needs 11.5.1+, while the Node 22 the
       # `verify` matrix tests against ships npm 10. The package's own floor is
       # Node 22, and that is what `verify` holds it to.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
